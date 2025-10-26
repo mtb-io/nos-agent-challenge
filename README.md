@@ -1,17 +1,15 @@
 # Mercury CI - Commercial Intelligence Platform
 **AI-powered commercial intelligence for teams**
 
-<p align="center">
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) 
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/) 
+[![Next.js](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org/) 
 [![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-</p>
 
 *Transforming raw data into actionable intelligence through AI-powered automation.*
 
 <p align="center">
-  <img src="./assets/MercuryCI.png" alt="Mercury CI dashboard preview" width="100%">
+  <img src="./assets/MecuryCI.png" alt="Mercury CI dashboard preview" width="100%">
 </p>
 
 ## Welcome to Mercury CI
