@@ -113,7 +113,7 @@ export default function LoginPage() {
           {/* Additional Info */}
           <div className="mt-8 text-center">
             <p className="text-white/60 text-sm">
-              Built with ❤️ by <span className="text-primary-400 font-medium">mtb labs</span>
+              Built with 💙 by <span className="text-primary-400 font-medium">mtb labs</span>
             </p>
           </div>
         </div>

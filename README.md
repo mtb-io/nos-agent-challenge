@@ -273,6 +273,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Mercury CI** - Commercial Intelligence for Teams  
-Built with ❤️ by [mtb labs](https://github.com/mtb-io)
+Built with 💙 by [mtb labs](https://github.com/mtb-io)
 
 *Transforming raw data into actionable intelligence through AI-powered automation.*

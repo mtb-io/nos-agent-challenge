@@ -56,7 +56,7 @@ export default function MercuryCIPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-neutral-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-neutral-200 shadow-sm">
         <div className="container mx-auto px-4 py-4">
@@ -150,6 +150,28 @@ export default function MercuryCIPage() {
       </main>
 
       {/* Chat Sidebar */}
+      {/* Footer */}
+      <footer className="bg-white border-t border-neutral-200 py-6 mt-auto">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+            <div className="text-sm text-neutral-600">
+              © {new Date().getFullYear() === 2025 ? 'twenty twenty-five' : new Date().getFullYear()} Mercury CI. All rights reserved.
+            </div>
+            <div className="text-sm text-neutral-600">
+              Built with 💙 by{' '}
+              <a 
+                href="https://mtblabs.io" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary-500 hover:text-primary-600 transition-colors font-medium"
+              >
+                mtb labs
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
+
       <CopilotSidebar
         clickOutsideToClose={false}
         defaultOpen={true}
