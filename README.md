@@ -1,23 +1,24 @@
-# Builders' Challenge #3: AI Agents 102
-**Presented by Nosana and Mastra**
+# Mercury CI - Commercial Intelligence Platform
+**AI-powered commercial intelligence for teams**
 
-![Agent](./assets/NosanaBuildersChallenge03.jpg)
+![Mercury CI](./assets/NosanaBuildersChallenge03.jpg)
 
-## Welcome to the AI Agent Challenge
+## Welcome to Mercury CI
 
-Build and deploy intelligent AI agents using the **Mastra framework** on the **Nosana decentralized compute network**. Whether you're a beginner or an experienced developer, this challenge has something for everyone!
+Mercury CI is an AI-powered commercial intelligence platform that helps teams generate daily briefings, analyse CSV data, and create actionable business insights. Built with the **Mastra framework** and deployed on the **Nosana decentralized compute network**.
 
-## 🎯 Challenge Overview
+## 🎯 Platform Overview
 
-**Your Mission:** Build an intelligent AI agent with a frontend interface and deploy it on Nosana's decentralized network.
+**Mission:** Transform raw data into actionable intelligence through AI-powered analysis and automated reporting.
 
-### What You'll Build
+### Key Features
 
-Create an AI agent that performs real-world tasks using:
-- **Mastra framework** for agent orchestration
-- **Tool calling** to interact with external services
-- **MCP (Model Context Protocol)** for enhanced capabilities
-- **Custom frontend** to showcase your agent's functionality
+Mercury CI provides intelligent business analysis through:
+- **Daily Intelligence Briefings** - Automated market and business insights
+- **CSV Data Analysis** - Upload and analyse business data with AI insights
+- **Automated Reporting** - Generate comprehensive reports and exports
+- **Natural Language Queries** - Ask questions about your data in plain English
+- **Memory System** - Learns from your preferences and gets smarter over time
 
 ### Agent Ideas & Examples
 
@@ -38,6 +39,25 @@ The possibilities are endless! Here are some ideas to get you started:
 This is a starter template for building AI agents using [Mastra](https://mastra.ai) and [CopilotKit](https://copilotkit.ai). It provides a modern Next.js application with integrated AI capabilities and a beautiful UI.
 
 ## Getting Started
+
+### Quick Start with Docker Compose
+
+The fastest way to get Mercury CI running:
+
+```bash
+# Clone the repository
+git clone <your-fork-url>
+cd nos-agent-challenge
+
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your API keys
+
+# Start with Docker Compose
+docker compose up --build
+
+# Access Mercury CI at http://localhost:3000
+```
 
 ### Prerequisites & Registration
 
@@ -131,17 +151,40 @@ OPENAI_API_KEY=your-key-here
 2. **Build**: Create Docker container using the provided `Dockerfile`
 3. **Test locally**: Verify container works correctly
 
+#### Option A: Using Docker Compose (Recommended)
+
+```bash
+# Build and start Mercury CI with Docker Compose
+docker compose up --build
+
+# Stop the services
+docker compose down
+
+# View logs
+docker compose logs -f
+```
+
+#### Option B: Manual Docker Commands
+
 ```bash
 # Build your container (using the provided Dockerfile)
-docker build -t yourusername/agent-challenge:latest .
+docker build -t yourusername/mercury-ci:latest .
 
 # Test locally first
-docker run -p 3000:3000 yourusername/agent-challenge:latest 
+docker run -p 3000:3000 -p 4111:4111 yourusername/mercury-ci:latest 
 
 # Push to Docker Hub
 docker login
-docker push yourusername/agent-challenge:latest
+docker push yourusername/mercury-ci:latest
 ```
+
+#### Docker Compose Configuration
+
+The included `docker-compose.yml` provides:
+- **Frontend**: Next.js app on port 3000
+- **Backend**: Mastra agent API on port 4111
+- **Environment**: Automatic `.env` file loading
+- **Networking**: Internal service communication
 
 ### Phase 3: Deployment to Nosana
 1. **Deploy your complete stack**: The provided `Dockerfile` will deploy:

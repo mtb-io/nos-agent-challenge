@@ -1,6 +1,7 @@
 {
-  "name": "starter",
+  "name": "mercury-ci",
   "version": "0.1.0",
+  "description": "AI-powered commercial intelligence platform for daily briefings, data analysis, and actionable insights",
   "private": true,
   "scripts": {
     "dev:agent": "mastra dev",

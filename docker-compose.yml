@@ -1,0 +1,13 @@
+services:
+  nos-agent-challenge:
+    build: .
+    ports:
+      - "3000:3000"  # Frontend
+      - "4111:4111"  # Mastra API
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./:/app
+    restart: unless-stopped

@@ -15,13 +15,13 @@ const ollama = createOllama({
   baseURL: process.env.NOS_OLLAMA_API_URL || process.env.OLLAMA_API_URL,
 })
 
-export const weatherAgent = new Agent({
-  name: "Weather Agent",
+export const mercuryAgent = new Agent({
+  name: "Mercury CI Assistant",
   tools: { weatherTool },
-  // model: openai("gpt-4o"), // uncomment this line to use openai
-  model: ollama(process.env.NOS_MODEL_NAME_AT_ENDPOINT || process.env.MODEL_NAME_AT_ENDPOINT || "qwen3:8b"), // comment this line to use openai
-  instructions: "You are a helpful assistant.",
-  description: "An agent that can get the weather for a given location.",
+  model: openai("gpt-4o"), // Using OpenAI for reliable performance
+  // model: ollama(process.env.NOS_MODEL_NAME_AT_ENDPOINT || process.env.MODEL_NAME_AT_ENDPOINT || "qwen3:8b"), // Alternative: Use Ollama
+  instructions: "You are Mercury CI, a Commercial Intelligence assistant. You help teams generate daily briefings, analyse CSV data, and create actionable business insights. You specialise in data analysis, market intelligence, and automated reporting.",
+  description: "An AI agent that provides commercial intelligence through daily briefings, data analysis, and business insights.",
   memory: new Memory({
     storage: new LibSQLStore({ url: "file::memory:" }),
     options: {

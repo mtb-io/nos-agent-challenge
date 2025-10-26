@@ -1,21 +1,77 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Mercury CI Design System */
+  --color-primary-50: #f0f4ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-400: #8b5cf6;
+  --color-primary-500: #7199ff;
+  --color-primary-600: #6366f1;
+  --color-primary-700: #4f46e5;
+  --color-primary-800: #3730a3;
+  --color-primary-900: #312e81;
+  
+  --color-success-500: #10b981;
+  --color-warning-500: #f59e0b;
+  --color-error-500: #ef4444;
+  
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #f1f5f9;
+  --color-neutral-200: #e2e8f0;
+  --color-neutral-300: #cbd5e1;
+  --color-neutral-400: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1e293b;
+  --color-neutral-900: #0f172a;
+  
+  --background: var(--color-neutral-50);
+  --foreground: var(--color-neutral-800);
+  --surface: #ffffff;
+  --border: var(--color-neutral-200);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-primary-50: var(--color-primary-50);
+  --color-primary-100: var(--color-primary-100);
+  --color-primary-200: var(--color-primary-200);
+  --color-primary-300: var(--color-primary-300);
+  --color-primary-400: var(--color-primary-400);
+  --color-primary-500: var(--color-primary-500);
+  --color-primary-600: var(--color-primary-600);
+  --color-primary-700: var(--color-primary-700);
+  --color-primary-800: var(--color-primary-800);
+  --color-primary-900: var(--color-primary-900);
+  --color-success-500: var(--color-success-500);
+  --color-warning-500: var(--color-warning-500);
+  --color-error-500: var(--color-error-500);
+  --color-neutral-50: var(--color-neutral-50);
+  --color-neutral-100: var(--color-neutral-100);
+  --color-neutral-200: var(--color-neutral-200);
+  --color-neutral-300: var(--color-neutral-300);
+  --color-neutral-400: var(--color-neutral-400);
+  --color-neutral-500: var(--color-neutral-500);
+  --color-neutral-600: var(--color-neutral-600);
+  --color-neutral-700: var(--color-neutral-700);
+  --color-neutral-800: var(--color-neutral-800);
+  --color-neutral-900: var(--color-neutral-900);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: var(--color-neutral-900);
+    --foreground: var(--color-neutral-100);
+    --surface: var(--color-neutral-800);
+    --border: var(--color-neutral-700);
   }
 }
 
@@ -28,4 +84,128 @@ body {
 body,
 html {
   height: 100%;
+}
+
+/* Mercury CI Custom Styles */
+.mercury-gradient {
+  background: linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%);
+}
+
+.mercury-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  transition: all 0.2s ease-out;
+}
+
+.mercury-card:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  transform: translateY(-1px);
+}
+
+.mercury-button {
+  background: var(--color-primary-500);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 24px;
+  font-weight: 500;
+  transition: all 0.2s ease-out;
+  cursor: pointer;
+}
+
+.mercury-button:hover {
+  background: var(--color-primary-600);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+.mercury-button:active {
+  transform: translateY(0);
+}
+
+/* Animation utilities */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s ease-out;
+}
+
+.animate-count-up {
+  animation: countUp 1s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes countUp {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Mercury CI CopilotKit Styling */
+.mercury-copilot-sidebar {
+  --copilot-kit-primary-color: #7199ff !important;
+  --copilot-kit-background: #ffffff !important;
+  --copilot-kit-foreground: #1e293b !important;
+  --copilot-kit-border: #e2e8f0 !important;
+  --copilot-kit-muted: #f1f5f9 !important;
+  --copilot-kit-muted-foreground: #64748b !important;
+  --copilot-kit-accent: #f0f4ff !important;
+  --copilot-kit-accent-foreground: #312e81 !important;
+  --copilot-kit-destructive: #ef4444 !important;
+  --copilot-kit-destructive-foreground: white !important;
+  --copilot-kit-ring: #7199ff !important;
+  --copilot-kit-radius: 12px !important;
+}
+
+/* Chat Icon Background */
+[data-copilotkit-sidebar] [data-copilotkit-sidebar-toggle] {
+  background: #7199ff !important;
+  color: white !important;
+}
+
+/* User Chat Message Background */
+[data-copilotkit-sidebar] [data-copilotkit-message][data-copilotkit-message-role="user"] {
+  background: #7199ff !important;
+  color: white !important;
+  border-color: #6366f1 !important;
+}
+
+/* Assistant Message Background */
+[data-copilotkit-sidebar] [data-copilotkit-message][data-copilotkit-message-role="assistant"] {
+  background: #ffffff !important;
+  color: #1e293b !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Send Button */
+[data-copilotkit-sidebar] [data-copilotkit-send-button] {
+  background: #7199ff !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+}
+
+[data-copilotkit-sidebar] [data-copilotkit-send-button]:hover {
+  background: #6366f1 !important;
 }
