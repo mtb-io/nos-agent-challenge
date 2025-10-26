@@ -1,7 +1,7 @@
 # Mercury CI - Commercial Intelligence Platform
 **AI-powered commercial intelligence for teams**
 
-![Mercury CI](./assets/NosanaBuildersChallenge03.jpg)
+![Mercury CI](./assets/MecuryCI.png)
 
 ## Welcome to Mercury CI
 
