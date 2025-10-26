@@ -20,23 +20,15 @@ Mercury CI provides intelligent business analysis through:
 - **Natural Language Queries** - Ask questions about your data in plain English
 - **Memory System** - Learns from your preferences and gets smarter over time
 
-### Agent Ideas & Examples
+### Technology Stack
 
-The possibilities are endless! Here are some ideas to get you started:
-
-- 🤖 **Personal Assistant** - Schedule management, email drafting, task automation
-- 📊 **Data Analyst Agent** - Fetch financial data, generate insights, create visualizations
-- 🌐 **Web Researcher** - Aggregate information from multiple sources, summarize findings
-- 🛠️ **DevOps Helper** - Monitor services, automate deployments, manage infrastructure
-- 🎨 **Content Creator** - Generate social media posts, blog outlines, marketing copy
-- 🔍 **Smart Search** - Multi-source search with AI-powered result synthesis
-- 💬 **Customer Support Bot** - Answer FAQs, ticket routing, knowledge base queries
-
-**Be Creative!** The best agents solve real problems in innovative ways.
-
-## Getting Started Template
-
-This is a starter template for building AI agents using [Mastra](https://mastra.ai) and [CopilotKit](https://copilotkit.ai). It provides a modern Next.js application with integrated AI capabilities and a beautiful UI.
+Mercury CI is built with modern technologies:
+- **Mastra Framework** - AI agent orchestration and management
+- **CopilotKit** - Natural language chat interface
+- **Next.js** - React-based frontend framework
+- **OpenAI GPT-4o** - Advanced language model for intelligence
+- **Docker** - Containerized deployment
+- **Nosana Network** - Decentralized compute infrastructure
 
 ## Getting Started
 
@@ -46,7 +38,7 @@ The fastest way to get Mercury CI running:
 
 ```bash
 # Clone the repository
-git clone <your-fork-url>
+git clone https://github.com/mtb-io/nos-agent-challenge.git
 cd nos-agent-challenge
 
 # Set up environment variables
@@ -168,14 +160,14 @@ docker compose logs -f
 
 ```bash
 # Build your container (using the provided Dockerfile)
-docker build -t yourusername/mercury-ci:latest .
+docker build -t mtb-io/nos-agent-challenge:latest .
 
 # Test locally first
-docker run -p 3000:3000 -p 4111:4111 yourusername/mercury-ci:latest 
+docker run -p 3000:3000 -p 4111:4111 mtb-io/nos-agent-challenge:latest 
 
 # Push to Docker Hub
 docker login
-docker push yourusername/mercury-ci:latest
+docker push mtb-io/nos-agent-challenge:latest
 ```
 
 #### Docker Compose Configuration
@@ -212,35 +204,39 @@ Update this README with:
 - Environment variables required
 - Example usage and screenshots
 
-## ✅ Minimum Requirements
+## ✅ Mercury CI Features
 
-Your submission **must** include:
+Current implementation includes:
 
-- [ ] **Agent with Tool Calling** - At least one custom tool/function
-- [ ] **Frontend Interface** - Working UI to interact with your agent
-- [ ] **Deployed on Nosana** - Complete stack running on Nosana network
-- [ ] **Docker Container** - Published to Docker Hub
-- [ ] **Video Demo** - 1-3 minute demonstration
-- [ ] **Updated README** - Clear documentation in your forked repo
-- [ ] **Social Media Post** - Share on X/BlueSky/LinkedIn with #NosanaAgentChallenge
+- [x] **Mercury CI Agent** - Commercial intelligence assistant with OpenAI integration
+- [x] **Modern UI** - Three-tab interface (Briefing, Data, Artifacts) with animations
+- [x] **Docker Support** - Complete containerization with Docker Compose
+- [x] **British English** - Proper UK spelling and date formats throughout
+- [x] **MIT License** - Open source distribution
+- [x] **Comprehensive Documentation** - Setup and deployment instructions
+- [ ] **Google OAuth** - User authentication (planned)
+- [ ] **CSV Analysis** - Real data processing (planned)
+- [ ] **Report Generation** - Automated PDF/Excel exports (planned)
 
-## Submission Process
+## 🚀 Next Steps
 
-1. **Complete all requirements** listed above
-2. **Commit all of your changes to the `main` branch of your forked repository**
-   - All your code changes
-   - Updated README
-   - Link to your Docker container
-   - Link to your video demo
-   - Nosana deployment proof
-3. **Social Media Post** (Required): Share your submission on X (Twitter), BlueSky, or LinkedIn
-   - Tag @nosana_ai
-   - Include a brief description of your agent
-   - Add hashtag #NosanaAgentChallenge
-4. **Finalize your submission on the [SuperTeam page](https://earn.superteam.fun/listing/nosana-builders-challenge-agents-102)**
-   - Add your forked GitHub repository link
-   - Add a link to your social media post
-   - Submissions that do not meet all requirements will not be considered
+### Phase 1: Core Functionality (Current)
+- ✅ Mercury CI UI and branding
+- ✅ Docker Compose setup
+- ✅ OpenAI integration
+- ✅ Basic agent configuration
+
+### Phase 2: Data Integration (Planned)
+- 🔄 Google OAuth authentication
+- 🔄 Gmail/Calendar API integration
+- 🔄 CSV file upload and analysis
+- 🔄 Real-time data collection
+
+### Phase 3: Advanced Features (Future)
+- 🔄 Automated report generation
+- 🔄 Advanced analytics and insights
+- 🔄 Multi-user collaboration
+- 🔄 Nosana deployment
 
 ## 🚀 Deploying to Nosana
 
