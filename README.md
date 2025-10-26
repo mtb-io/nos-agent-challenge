@@ -1,11 +1,24 @@
 # Mercury CI - Commercial Intelligence Platform
 **AI-powered commercial intelligence for teams**
 
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+
 ![Mercury CI](./assets/MecuryCI.png)
 
 ## Welcome to Mercury CI
 
-Mercury CI is an AI-powered commercial intelligence platform that helps teams generate daily briefings, analyse CSV data, and create actionable business insights. Built with the **Mastra framework** and deployed on the **Nosana decentralized compute network**.
+Mercury CI is an AI-powered commercial intelligence platform that helps teams generate daily briefings, analyse CSV data, and create actionable business insights. Built with the **Mastra framework** and deployed on the **Nosana decentralised compute network**.
+
+**Default provider: OpenAI.** For challenge verification, set `OLLAMA_API_URL` to the shared Nosana endpoint or local Ollama.
+
+## 🏗️ Architecture
+
+```
+Next.js UI → Mastra Agent → Provider (OpenAI | Ollama/Nosana)
+```
 
 ## 🎯 Platform Overview
 
@@ -27,7 +40,7 @@ Mercury CI is built with modern technologies:
 - **CopilotKit** - Natural language chat interface
 - **Next.js** - React-based frontend framework
 - **OpenAI GPT-4o** - Advanced language model for intelligence
-- **Docker** - Containerized deployment
+- **Docker** - Containerised deployment
 - **Nosana Network** - Decentralised compute infrastructure
 
 ## Getting Started
@@ -98,7 +111,7 @@ OLLAMA_API_URL=https://3yt39qx97wc9hqwwmylrphi4jsxrngjzxnjakkybnxbw.node.k8s.prd
 MODEL_NAME_AT_ENDPOINT=qwen3:8b
 ```
 
-If it goes down, reach out on [Discord](https://discord.com/channels/236263424676331521/1354391113028337664)
+**⚠️ If this shared endpoint returns HTML "Faithfully yours, frp.", use Option C (OpenAI) or Option B (local Ollama).**
 
 ##### Option B: Use Local LLM
 
@@ -122,6 +135,12 @@ Add to your `.env` and uncomment the OpenAI line in `src/mastra/agents/index.ts`
 ```env
 OPENAI_API_KEY=your-key-here
 ```
+
+## 🔧 Troubleshooting
+
+- **HTML "Faithfully yours, frp."** → your Nosana node isn't bound; switch to OpenAI or local Ollama.
+- **Docker build takes ages** → ensure `.dockerignore` excludes `.next`, `node_modules`; run `pnpm install` outside Docker for dev.
+- **401 from OpenAI** → check `OPENAI_API_KEY` in `.env`.
 
 ## 🚀 Deployment
 
@@ -166,7 +185,7 @@ Current implementation includes:
 
 - [x] **Mercury CI Agent** - Commercial intelligence assistant with OpenAI integration
 - [x] **Modern UI** - Three-tab interface (Briefing, Data, Artifacts) with animations
-- [x] **Docker Support** - Complete containerization with Docker Compose
+- [x] **Docker Support** - Complete containerisation with Docker Compose
 - [x] **British English** - Proper UK spelling and date formats throughout
 - [x] **MIT License** - Open source distribution
 - [x] **Comprehensive Documentation** - Setup and deployment instructions
@@ -195,7 +214,6 @@ Current implementation includes:
 - 🔄 Nosana deployment
 
 ## 🚀 Deploying to Nosana
-
 
 ### Using Nosana Dashboard
 1. Open [Nosana Dashboard](https://dashboard.nosana.com/deploy)
@@ -233,13 +251,8 @@ For more information, check out the following resources:
 ## 🆘 Support & Community
 
 ### Get Help
-- **Discord**: Join [Nosana Discord](https://nosana.com/discord) 
-- **Dedicated Channel**: [Builders Challenge Dev Chat](https://discord.com/channels/236263424676331521/1354391113028337664)
+- **Discord**: Join [Nosana Discord](https://discord.gg/nosana) 
 - **X (Twitter)**: Follow [@nosana_ai](https://x.com/nosana_ai) for live updates
-
-## 🤝 Contributing
-
-We welcome contributions to Mercury CI! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
 
 ## 📄 License
 
@@ -251,5 +264,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Built with ❤️ by [mtb labs](https://github.com/mtb-io)
 
 *Transforming raw data into actionable intelligence through AI-powered analysis and automated reporting.*
-
-
