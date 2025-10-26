@@ -1,12 +1,18 @@
 # Mercury CI - Commercial Intelligence Platform
 **AI-powered commercial intelligence for teams**
 
+<p align="center">
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-000000?logo=next.js&logoColor=white)](https://nextjs.org/)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+</p>
 
-![Mercury CI](./assets/MecuryCI.png)
+*Transforming raw data into actionable intelligence through AI-powered automation.*
+
+<p align="center">
+  <img src="./assets/MercuryCI.png" alt="Mercury CI dashboard preview" width="100%">
+</p>
 
 ## Welcome to Mercury CI
 
@@ -17,8 +23,10 @@ Mercury CI is an AI-powered commercial intelligence platform that helps teams ge
 ## 🏗️ Architecture
 
 ```
-Next.js UI → Mastra Agent → Provider (OpenAI | Ollama/Nosana)
+Next.js UI → Mastra Agent → Provider (OpenAI | Ollama | Nosana)
 ```
+
+*(Mercury CI's architecture showing the flow between the Next.js frontend, Mastra agent backend, and provider models)*
 
 ## 🎯 Platform Overview
 
@@ -136,6 +144,8 @@ Add to your `.env` and uncomment the OpenAI line in `src/mastra/agents/index.ts`
 OPENAI_API_KEY=your-key-here
 ```
 
+(Recommended for stability and development speed)
+
 ## 🔧 Troubleshooting
 
 - **HTML "Faithfully yours, frp."** → your Nosana node isn't bound; switch to OpenAI or local Ollama.
@@ -213,6 +223,10 @@ Current implementation includes:
 - 🔄 Multi-user collaboration
 - 🔄 Nosana deployment
 
+## 🏆 Challenge Compatibility
+
+This project can be evaluated using the shared Nosana LLM endpoint or any local Ollama setup. OpenAI is used for stable development and demonstration.
+
 ## 🚀 Deploying to Nosana
 
 ### Using Nosana Dashboard
@@ -226,7 +240,7 @@ Current implementation includes:
    ```
 4. Copy and paste the edited job definition
 5. Select a GPU
-6. Click `Deploy`
+6. Click `Deploy Job`
 
 ### Using Nosana CLI (Alternative)
 ```bash
@@ -239,14 +253,14 @@ nosana job post --file ./nos_job_def/nosana_mastra.json --market nvidia-3090 --t
 For more information, check out the following resources:
 
 - [Nosana Documentation](https://docs.nosana.io)
-- [Mastra Documentation](https://mastra.ai/en/docs) - Learn more about Mastra and its features
+- [Mastra Documentation](https://mastra.ai/docs) - Learn more about Mastra and its features
 - [CopilotKit Documentation](https://docs.copilotkit.ai) - Explore CopilotKit's capabilities
 - [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
 - [Docker Documentation](https://docs.docker.com)
 - [Nosana CLI](https://github.com/nosana-ci/nosana-cli)
-- [Mastra Agents Overview](https://mastra.ai/en/docs/agents/overview)
-- [Build an AI Stock Agent Guide](https://mastra.ai/en/guides/guide/stock-agent)
-- [Mastra Tool Calling Documentation](https://mastra.ai/en/docs/agents/tools)
+- [Mastra Agents Overview](https://mastra.ai/docs/agents/overview)
+- [Build an AI Stock Agent Guide](https://mastra.ai/guides/stock-agent)
+- [Mastra Tool Calling Documentation](https://mastra.ai/docs/agents/tools)
 
 ## 🆘 Support & Community
 
@@ -263,4 +277,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Mercury CI** - Commercial Intelligence for Teams  
 Built with ❤️ by [mtb labs](https://github.com/mtb-io)
 
-*Transforming raw data into actionable intelligence through AI-powered analysis and automated reporting.*
+*Transforming raw data into actionable intelligence through AI-powered automation.*
