@@ -1,10 +1,59 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CopilotSidebar } from "@copilotkit/react-ui";
+import { useRouter } from "next/navigation";
 
 export default function MercuryCIPage() {
   const [activeTab, setActiveTab] = useState('briefing');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    // Check authentication status
+    // For now, we'll simulate a check
+    const checkAuth = () => {
+      const authStatus = localStorage.getItem('mercury-auth');
+      const userData = localStorage.getItem('mercury-user');
+      
+      if (authStatus === 'true') {
+        setIsAuthenticated(true);
+        if (userData) {
+          setUser(JSON.parse(userData));
+        }
+      } else {
+        router.push('/login');
+      }
+      setIsLoading(false);
+    };
+
+    checkAuth();
+  }, [router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('mercury-auth');
+    localStorage.removeItem('mercury-user');
+    setIsAuthenticated(false);
+    setUser(null);
+    router.push('/login');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-neutral-600">Loading Mercury CI...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null; // Will redirect to login
+  }
 
   return (
     <div className="min-h-screen bg-neutral-50">
@@ -34,13 +83,25 @@ export default function MercuryCIPage() {
 
               {/* User Profile */}
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-neutral-200 rounded-full flex items-center justify-center border border-neutral-300">
-                  <span className="text-neutral-700 text-sm font-medium">U</span>
+                <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-sm font-medium">
+                    {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                  </span>
                 </div>
                 <div className="hidden md:block">
-                  <p className="text-sm font-medium text-neutral-900">User</p>
-                  <p className="text-xs text-neutral-500">Admin</p>
+                  <p className="text-sm font-medium text-neutral-900">
+                    {user?.name || 'User'}
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    {user?.email || 'user@mercury-ci.com'}
+                  </p>
                 </div>
+                <button
+                  onClick={handleLogout}
+                  className="ml-2 px-3 py-1 text-xs text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 rounded-md transition-colors"
+                >
+                  Logout
+                </button>
               </div>
 
               {/* Settings Button */}
