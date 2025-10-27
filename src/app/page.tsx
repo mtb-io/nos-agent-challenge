@@ -57,11 +57,7 @@ const analyzeBinaryFile = (fileName: string, fileExtension: string, content: str
       'Create automated processing workflows for similar documents',
       'Develop custom intelligence extraction templates'
     ],
-    visualisations: [
-      { type: 'bar', title: 'Content Analysis', description: 'bar chart' },
-      { type: 'line', title: 'Document Structure', description: 'line chart' },
-      { type: 'pie', title: 'Content Intelligence', description: 'scatter chart' }
-    ],
+    visualisations: generatePracticalVisualizations('Document', [], [], [], [], [], []),
     confidence: 0.9,
     dataQuality: 'High',
     processedRows: wordCount
@@ -228,19 +224,8 @@ const generatePracticalVisualizations = (docType: string, emails: string[], phon
     });
   }
   
-  // Default visualization if no specific data
-  if (visualizations.length === 0) {
-    visualizations.push({
-      type: 'info',
-      title: 'Document Overview',
-      description: 'Basic document information',
-      icon: '📄',
-      data: {
-        type: docType,
-        wordCount: 0
-      }
-    });
-  }
+  // Only show visualizations if there's actual data
+  // No default empty visualizations
   
   return visualizations;
 };
@@ -1769,13 +1754,15 @@ function DataTab() {
           `Create automated processing workflows for ${fileExtension.toUpperCase()} documents with similar content patterns`,
           'Develop custom intelligence extraction templates based on document type and content'
         ],
-        visualisations: [
-          { type: 'bar', title: 'Content Analysis', description: `Show word frequency and ${allTopics[0]} distribution` },
-          { type: 'line', title: 'Document Structure', description: 'Display paragraph and line count analysis' },
-          { type: 'scatter', title: 'Content Intelligence', description: `Visualise ${allTopics[0]} and ${allTopics[1] || 'content'} patterns` },
-          contentAnalysis.hasCurrency ? { type: 'pie', title: 'Financial Data', description: 'Show currency and financial information breakdown' } : null,
-          contentAnalysis.hasDates ? { type: 'timeline', title: 'Temporal Analysis', description: 'Display date patterns and timeline insights' } : null
-        ].filter(Boolean)
+        visualisations: generatePracticalVisualizations(
+          inference.type.replace('_', ' ').charAt(0).toUpperCase() + inference.type.replace('_', ' ').slice(1),
+          [], // emails - not extracted in this function
+          [], // phones - not extracted in this function  
+          [], // postcodes - not extracted in this function
+          [], // currencies - not extracted in this function
+          [], // niNumbers - not extracted in this function
+          []  // dates - not extracted in this function
+        )
       };
 
       // Add specific insights based on document type
@@ -2523,7 +2510,7 @@ function DataTab() {
               </div>
 
               {/* Practical Visualisations */}
-              {file.analysisResult.visualisations && (
+              {file.analysisResult.visualisations && file.analysisResult.visualisations.length > 0 && (
             <div>
                   <div className="flex items-center space-x-2 mb-4">
                     <div className="w-1 h-6 bg-primary-500 rounded"></div>
