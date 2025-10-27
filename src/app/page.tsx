@@ -18,9 +18,31 @@ interface StoredBriefing {
   archivedAt?: string;
 }
 
+// Report storage utilities
+interface StoredReport {
+  id: string;
+  reportType: string;
+  title: string;
+  executiveSummary: string;
+  sections: Array<{
+    title: string;
+    content: string;
+  }>;
+  recommendations: string[];
+  metadata: {
+    generatedAt: string;
+    reportType: string;
+    dataSources: string[];
+    confidence: number;
+  };
+  generatedAt: string;
+}
+
 const BRIEFING_STORAGE_KEY = 'mercury-briefings';
 const BRIEFING_ARCHIVE_KEY = 'mercury-briefings-archive';
+const REPORT_STORAGE_KEY = 'mercury-reports';
 const MAX_BRIEFINGS = 20;
+const MAX_REPORTS = 10;
 const ARCHIVE_DAYS = 30;
 
 const saveBriefing = (briefing: StoredBriefing) => {
@@ -78,6 +100,38 @@ const cleanupArchivedBriefings = () => {
   );
   
   localStorage.setItem(BRIEFING_ARCHIVE_KEY, JSON.stringify(validArchived));
+};
+
+// Report storage functions
+const saveReport = (report: StoredReport) => {
+  const reports = getStoredReports();
+  reports.unshift(report); // Add to beginning
+  
+  // Keep only the most recent 10 reports
+  if (reports.length > MAX_REPORTS) {
+    reports.splice(MAX_REPORTS);
+  }
+  
+  console.log('Saving report:', report);
+  console.log('All reports after save:', reports);
+  localStorage.setItem(REPORT_STORAGE_KEY, JSON.stringify(reports));
+};
+
+const getStoredReports = (): StoredReport[] => {
+  try {
+    const stored = localStorage.getItem(REPORT_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+const deleteReport = (reportId: string) => {
+  const reports = getStoredReports();
+  const updatedReports = reports.filter(r => r.id !== reportId);
+  localStorage.setItem(REPORT_STORAGE_KEY, JSON.stringify(updatedReports));
+  console.log('Deleted report:', reportId);
+  console.log('Remaining reports:', updatedReports);
 };
 
 const deleteBriefing = (id: string) => {
@@ -141,7 +195,7 @@ export default function MercuryCIPage() {
   };
 
   if (isLoading) {
-    return (
+  return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -614,13 +668,13 @@ This briefing incorporates data from: ${selectedSources.join(', ')}`,
           </div>
 
           {/* Generate Button */}
-          <button 
+              <button
             onClick={generateBriefing}
             disabled={isGenerating}
             className="w-full bg-primary-500 hover:bg-primary-600 disabled:bg-primary-300 text-white font-medium py-3 px-4 rounded-lg transition-colors"
           >
             {isGenerating ? 'Generating...' : 'Generate Intelligence Briefing'}
-          </button>
+              </button>
         </div>
       </div>
 
@@ -731,10 +785,10 @@ This briefing incorporates data from: ${selectedSources.join(', ')}`,
                       <p className={`text-sm font-medium ${kpi.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
                         {kpi.change}
                       </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            </div>
+          ))}
+        </div>
+      </div>
             )}
             
             {/* Insights Display */}
@@ -788,7 +842,7 @@ function BriefingHistorySidebar({
   const recentBriefings = briefings.slice(0, 5);
   const allBriefings = briefings;
 
-  return (
+    return (
     <>
       {/* Backdrop */}
       {showSidebar && (
@@ -812,7 +866,7 @@ function BriefingHistorySidebar({
             >
               ✕
             </button>
-          </div>
+        </div>
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6">
@@ -829,7 +883,7 @@ function BriefingHistorySidebar({
                       loadBriefing(briefing);
                     }}
                   >
-                    <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-neutral-900 truncate">
                           {briefing.title}
@@ -837,7 +891,7 @@ function BriefingHistorySidebar({
                         <p className="text-xs text-neutral-500">
                           {new Date(briefing.date).toLocaleDateString('en-GB')} • {briefing.sources.join(', ')}
                         </p>
-                      </div>
+          </div>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -847,15 +901,15 @@ function BriefingHistorySidebar({
                       >
                         🗑️
                       </button>
-                    </div>
-                  </div>
+        </div>
+          </div>
                 ))}
               </div>
-            </div>
+        </div>
 
             {/* All Briefings */}
             {allBriefings.length > 5 && (
-              <div>
+            <div>
                 <h4 className="text-sm font-medium text-neutral-600 mb-3">All Briefings</h4>
                 <div className="space-y-2">
                   {allBriefings.slice(5).map((briefing) => (
@@ -875,7 +929,7 @@ function BriefingHistorySidebar({
                           <p className="text-xs text-neutral-500">
                             {new Date(briefing.date).toLocaleDateString('en-GB')} • {briefing.sources.join(', ')}
                           </p>
-                        </div>
+            </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -885,20 +939,20 @@ function BriefingHistorySidebar({
                         >
                           🗑️
                         </button>
-                      </div>
-                    </div>
+            </div>
+            </div>
                   ))}
-                </div>
-              </div>
+          </div>
+        </div>
             )}
 
             {briefings.length === 0 && (
               <div className="text-center py-8">
                 <p className="text-neutral-500 text-sm">No briefings yet</p>
                 <p className="text-neutral-400 text-xs mt-1">Generate your first briefing to get started</p>
-              </div>
+      </div>
             )}
-          </div>
+    </div>
 
           {/* Footer */}
           <div className="p-6 border-t border-neutral-200">
@@ -1337,12 +1391,125 @@ function DataTab() {
 
 // Artifacts Tab Component
 function ArtifactsTab() {
-  const [reports, setReports] = useState([
-    { name: 'Daily Intelligence Briefing', date: '26/10/2025', type: 'PDF', size: '2.1MB', status: 'ready' },
-    { name: 'Market Analysis Report', date: '25/10/2025', type: 'PDF', size: '3.4MB', status: 'ready' },
-    { name: 'Customer Sentiment Analysis', date: '24/10/2025', type: 'Excel', size: '1.8MB', status: 'ready' },
-    { name: 'Competitive Intelligence Summary', date: '23/10/2025', type: 'PDF', size: '2.7MB', status: 'generating' }
-  ]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedReport, setGeneratedReport] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [reportType, setReportType] = useState<string>('');
+  const [reports, setReports] = useState<StoredReport[]>([]);
+  const [selectedReport, setSelectedReport] = useState<string | null>(null);
+
+  // Load reports on component mount
+  useEffect(() => {
+    const storedReports = getStoredReports();
+    setReports(storedReports);
+  }, []);
+
+  // Generate report function
+  const generateReport = async (type: string) => {
+    setIsGenerating(true);
+    setError(null);
+    setReportType(type);
+    
+    try {
+      // Simulate API call to reportTool
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Generate mock report data based on type
+      const reportData = {
+        id: `report-${Date.now()}`,
+        reportType: type,
+        title: `${type.charAt(0).toUpperCase() + type.slice(1)} Intelligence Report`,
+        executiveSummary: `This comprehensive ${type} intelligence report provides strategic insights and actionable recommendations based on current market conditions and data analysis. The report covers key market trends, competitive landscape, and strategic opportunities for business growth and optimisation.`,
+        sections: [
+          {
+            title: 'Executive Summary',
+            content: `This section provides detailed analysis of executive summary including key findings, trends, and strategic implications for business decision-making.`
+          },
+          {
+            title: 'Market Analysis',
+            content: `This section provides detailed analysis of market analysis including key findings, trends, and strategic implications for business decision-making.`
+          },
+          {
+            title: 'Competitive Landscape',
+            content: `This section provides detailed analysis of competitive landscape including key findings, trends, and strategic implications for business decision-making.`
+          },
+          {
+            title: 'Strategic Recommendations',
+            content: `This section provides detailed analysis of strategic recommendations including key findings, trends, and strategic implications for business decision-making.`
+          }
+        ],
+        recommendations: [
+          'Implement data-driven decision making processes across all departments',
+          'Invest in technology infrastructure to support advanced analytics',
+          'Develop strategic partnerships to enhance market position',
+          'Establish regular intelligence briefings for senior leadership',
+          'Create automated reporting systems for continuous monitoring'
+        ],
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          reportType: type,
+          dataSources: ['Market Data', 'Internal Analytics', 'Industry Reports', 'Public Information'],
+          confidence: 0.87
+        },
+        generatedAt: new Date().toISOString()
+      };
+      
+      // Save report to localStorage
+      saveReport(reportData);
+      setReports(prev => [reportData, ...prev]);
+      setGeneratedReport(reportData);
+      setSelectedReport(reportData.id);
+      
+      // Scroll to report results
+      setTimeout(() => {
+        const reportElement = document.querySelector('[data-report-result]');
+        if (reportElement) {
+          reportElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error('Report generation error:', error);
+      setError('Failed to generate report. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Load a specific report
+  const loadReport = (reportId: string) => {
+    const report = reports.find(r => r.id === reportId);
+    if (report) {
+      setGeneratedReport(report);
+      setSelectedReport(reportId);
+      
+      // Scroll to report results
+      setTimeout(() => {
+        const reportElement = document.querySelector('[data-report-result]');
+        if (reportElement) {
+          reportElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }
+      }, 100);
+    }
+  };
+
+  // Delete a report
+  const deleteReportById = (reportId: string) => {
+    deleteReport(reportId);
+    setReports(prev => prev.filter(r => r.id !== reportId));
+    
+    // Clear selected report if it was deleted
+    if (selectedReport === reportId) {
+      setSelectedReport(null);
+      setGeneratedReport(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -1350,55 +1517,177 @@ function ArtifactsTab() {
       <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
         <h2 className="text-xl font-semibold text-neutral-900 mb-4">Reports & Exports</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="bg-neutral-800 rounded-xl p-4 text-left hover:bg-neutral-700 transition-all animate-slide-up" style={{ animationDelay: '0s' }}>
+          <button 
+            onClick={() => generateReport('executive')}
+            disabled={isGenerating}
+            className="bg-neutral-800 rounded-xl p-4 text-left hover:bg-neutral-700 transition-all animate-slide-up disabled:opacity-50 disabled:cursor-not-allowed" 
+            style={{ animationDelay: '0s' }}
+          >
             <div className="text-2xl mb-2">📊</div>
-            <h3 className="font-medium text-white">Generate Report</h3>
-            <p className="text-sm text-neutral-400">Create new intelligence report</p>
+            <h3 className="font-medium text-white">Generate Executive Summary</h3>
+            <p className="text-sm text-neutral-400">Create executive intelligence report</p>
           </button>
-          <button className="bg-neutral-800 rounded-xl p-4 text-left hover:bg-neutral-700 transition-all animate-slide-up" style={{ animationDelay: '0.1s' }}>
+          <button 
+            onClick={() => generateReport('market')}
+            disabled={isGenerating}
+            className="bg-neutral-800 rounded-xl p-4 text-left hover:bg-neutral-700 transition-all animate-slide-up disabled:opacity-50 disabled:cursor-not-allowed" 
+            style={{ animationDelay: '0.1s' }}
+          >
             <div className="text-2xl mb-2">📈</div>
-            <h3 className="font-medium text-white">Export Data</h3>
-            <p className="text-sm text-neutral-400">Export analysis results</p>
+            <h3 className="font-medium text-white">Generate Market Analysis</h3>
+            <p className="text-sm text-neutral-400">Create market intelligence report</p>
           </button>
-          <button className="bg-neutral-800 rounded-xl p-4 text-left hover:bg-neutral-700 transition-all animate-slide-up" style={{ animationDelay: '0.2s' }}>
+          <button 
+            onClick={() => generateReport('strategic')}
+            disabled={isGenerating}
+            className="bg-neutral-800 rounded-xl p-4 text-left hover:bg-neutral-700 transition-all animate-slide-up disabled:opacity-50 disabled:cursor-not-allowed" 
+            style={{ animationDelay: '0.2s' }}
+          >
             <div className="text-2xl mb-2">📋</div>
-            <h3 className="font-medium text-white">Schedule Report</h3>
-            <p className="text-sm text-neutral-400">Set up automated reports</p>
+            <h3 className="font-medium text-white">Generate Strategic Report</h3>
+            <p className="text-sm text-neutral-400">Create strategic intelligence report</p>
           </button>
         </div>
       </div>
 
-      {/* Reports List */}
-      <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-        <h3 className="text-lg font-semibold text-neutral-900 mb-4">Recent Reports</h3>
-        <div className="space-y-3">
-          {reports.map((report, index) => (
-            <div key={index} className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-                  <span className="text-primary-600">
-                    {report.type === 'PDF' ? '📄' : '📊'}
-                  </span>
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="text-red-500 mr-2">⚠️</div>
+            <p className="text-red-700">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {isGenerating && (
+        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+            <span className="ml-3 text-neutral-600">Generating {reportType} report...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Report History */}
+      {reports.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-neutral-900">Recent Reports</h3>
+            <span className="text-sm text-neutral-500">{reports.length} of {MAX_REPORTS} reports</span>
+          </div>
+          <div className="space-y-3">
+            {reports.map((report) => (
+              <div key={report.id} className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                    <span className="text-primary-600">📊</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-neutral-900">{report.title}</p>
+                    <p className="text-sm text-neutral-600">
+                      {new Date(report.generatedAt).toLocaleDateString('en-GB')} • 
+                      {report.recommendations.length} recommendations • 
+                      {Math.round(report.metadata.confidence * 100)}% confidence
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-neutral-900">{report.name}</p>
-                  <p className="text-sm text-neutral-600">{report.date} • {report.size}</p>
+                <div className="flex items-center space-x-2">
+                  <button 
+                    onClick={() => loadReport(report.id)}
+                    className="text-primary-600 hover:text-primary-700"
+                  >
+                    View Report
+                  </button>
+                  <button
+                    onClick={() => deleteReportById(report.id)}
+                    className="text-red-500 hover:text-red-700 p-1"
+                    title="Delete report"
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  report.status === 'ready' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {report.status}
-                </span>
-                {report.status === 'ready' && (
-                  <button className="text-primary-600 hover:text-primary-700">Download</button>
-                )}
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Generated Report Display */}
+      {generatedReport && (
+        <div className="bg-white rounded-xl shadow-lg border border-neutral-200 overflow-hidden" data-report-result>
+          {/* Header */}
+          <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-white">{generatedReport.title}</h3>
+                <p className="text-primary-100 text-sm">
+                  Generated on {new Date(generatedReport.metadata.generatedAt).toLocaleDateString('en-GB')}
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-white text-sm">Confidence: {Math.round(generatedReport.metadata.confidence * 100)}%</div>
+                <div className="text-primary-100 text-xs">Type: {generatedReport.metadata.reportType}</div>
               </div>
             </div>
-          ))}
+          </div>
+
+          {/* Content */}
+          <div className="p-6">
+            {/* Executive Summary */}
+            <div className="mb-8">
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="w-1 h-6 bg-primary-500 rounded"></div>
+                <h4 className="text-lg font-semibold text-neutral-900">Executive Summary</h4>
+              </div>
+              <p className="text-neutral-700 leading-relaxed">{generatedReport.executiveSummary}</p>
+            </div>
+
+            {/* Report Sections */}
+            <div className="mb-8">
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="w-1 h-6 bg-primary-500 rounded"></div>
+                <h4 className="text-lg font-semibold text-neutral-900">Report Sections</h4>
+              </div>
+              <div className="space-y-4">
+                {generatedReport.sections.map((section: any, index: number) => (
+                  <div key={index} className="p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                    <h5 className="font-medium text-neutral-900 mb-2">{section.title}</h5>
+                    <p className="text-neutral-700 text-sm leading-relaxed">{section.content}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Recommendations */}
+            <div className="mb-8">
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="w-1 h-6 bg-primary-500 rounded"></div>
+                <h4 className="text-lg font-semibold text-neutral-900">Key Recommendations</h4>
+              </div>
+              <div className="space-y-3">
+                {generatedReport.recommendations.map((recommendation: string, index: number) => (
+                  <div key={index} className="flex items-start space-x-3 p-4 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex-shrink-0 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-sm font-bold">✓</span>
+                    </div>
+                    <p className="text-neutral-700 leading-relaxed">{recommendation}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="bg-neutral-50 px-6 py-3 border-t border-neutral-200">
+            <div className="flex items-center justify-between text-sm text-neutral-500">
+              <span>Data Sources: {generatedReport.metadata.dataSources.join(', ')}</span>
+              <span>Powered by Mercury CI Report Engine</span>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
