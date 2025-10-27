@@ -328,16 +328,33 @@ function BriefingTab({
   const [selectedSources, setSelectedSources] = useState(['news', 'market']);
   const [briefingDate, setBriefingDate] = useState(new Date().toISOString().split('T')[0]);
   const [userName, setUserName] = useState('mtb');
-  const [lastBriefingDate, setLastBriefingDate] = useState('25/10/2025');
+  const [lastBriefingDate, setLastBriefingDate] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [briefingResult, setBriefingResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Get last briefing date for display
+  const getLastBriefingDate = () => {
+    const briefings = getStoredBriefings();
+    if (briefings.length === 0) return 'No briefings yet';
+    
+    const lastBriefing = briefings[0];
+    return new Date(lastBriefing.generatedAt).toLocaleDateString('en-GB');
+  };
+
   // Contextual Greeting Logic
   const getContextualGreeting = () => {
     const today = new Date();
-    const lastBriefing = new Date('2025-10-25');
-    const daysSince = Math.floor((today.getTime() - lastBriefing.getTime()) / (1000 * 60 * 60 * 24));
+    const briefings = getStoredBriefings();
+    
+    if (briefings.length === 0) {
+      return `Welcome to Mercury CI, ${userName}. Ready to generate your first intelligence briefing?`;
+    }
+    
+    // Get the most recent briefing
+    const lastBriefing = briefings[0];
+    const lastBriefingDate = new Date(lastBriefing.generatedAt);
+    const daysSince = Math.floor((today.getTime() - lastBriefingDate.getTime()) / (1000 * 60 * 60 * 24));
     
     if (daysSince === 0) return `Welcome back, ${userName}. Ready for another briefing?`;
     if (daysSince === 1) return `Good to see you again, ${userName}. Yesterday's insights were valuable.`;
@@ -499,7 +516,7 @@ This briefing incorporates data from: ${selectedSources.join(', ')}`,
             </p>
             <div className="mt-2 flex items-center space-x-2 text-sm text-primary-600">
               <span className="w-2 h-2 bg-primary-500 rounded-full animate-pulse"></span>
-              <span>Memory active - Last briefing: {lastBriefingDate}</span>
+              <span>Memory active - Last briefing: {getLastBriefingDate()}</span>
       </div>
     </div>
         </div>
@@ -897,22 +914,254 @@ function BriefingHistorySidebar({
 
 // Data Tab Component
 function DataTab() {
-  const [uploadedFiles, setUploadedFiles] = useState([
-    { name: 'sales_data_2024.csv', size: '2.4MB', status: 'processed', insights: 12 },
-    { name: 'customer_feedback.csv', size: '856KB', status: 'analysing', insights: 0 },
-    { name: 'market_trends.csv', size: '1.2MB', status: 'processed', insights: 8 }
-  ]);
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{
+    id: string;
+    name: string;
+    size: string;
+    status: 'uploaded' | 'analysing' | 'processed' | 'error';
+    insights: number;
+    data?: string;
+    analysisResult?: any;
+    uploadedAt: string;
+  }>>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+
+  // File storage utilities
+  const DATA_FILES_STORAGE_KEY = 'mercury-data-files';
+  const MAX_FILES = 10;
+
+  const saveFiles = (files: typeof uploadedFiles) => {
+    localStorage.setItem(DATA_FILES_STORAGE_KEY, JSON.stringify(files));
+  };
+
+  const loadFiles = (): typeof uploadedFiles => {
+    try {
+      const stored = localStorage.getItem(DATA_FILES_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  // Load files on component mount
+  useEffect(() => {
+    const storedFiles = loadFiles();
+    setUploadedFiles(storedFiles);
+  }, []);
+
+  // Delete file
+  const deleteFile = (fileId: string) => {
+    setUploadedFiles(prev => {
+      const updated = prev.filter(f => f.id !== fileId);
+      saveFiles(updated);
+      return updated;
+    });
+    
+    // Clear selected file if it was deleted
+    if (selectedFile === fileId) {
+      setSelectedFile(null);
+    }
+  };
+
+  // Handle file upload
+  const handleFileUpload = async (files: FileList) => {
+    setIsUploading(true);
+    
+    const filePromises = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+        const fileId = `file-${Date.now()}-${i}`;
+        const fileSize = (file.size / 1024 / 1024).toFixed(1) + 'MB';
+        
+        // Create a promise for each file read
+        const filePromise = new Promise<void>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const content = e.target?.result as string;
+            console.log('File uploaded:', file.name, 'Size:', fileSize);
+            setUploadedFiles(prev => {
+              const newFile = {
+                id: fileId,
+                name: file.name,
+                size: fileSize,
+                status: 'uploaded' as const,
+                insights: 0,
+                data: content,
+                uploadedAt: new Date().toISOString()
+              };
+              const newFiles = [...prev, newFile];
+              
+              // Keep only the most recent files
+              if (newFiles.length > MAX_FILES) {
+                newFiles.splice(0, newFiles.length - MAX_FILES);
+              }
+              
+              console.log('Updated files:', newFiles);
+              saveFiles(newFiles);
+              return newFiles;
+            });
+            resolve();
+          };
+          reader.readAsText(file);
+        });
+        
+        filePromises.push(filePromise);
+      }
+    }
+    
+    // Wait for all files to be read before setting uploading to false
+    await Promise.all(filePromises);
+    setIsUploading(false);
+  };
+
+  // Handle drag and drop
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileUpload(e.dataTransfer.files);
+    }
+  };
+
+  // Handle file input change
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('File input changed:', e.target.files);
+    if (e.target.files && e.target.files[0]) {
+      console.log('Files selected:', e.target.files.length);
+      handleFileUpload(e.target.files);
+    }
+  };
+
+  // Analyse file
+  const analyseFile = async (fileId: string) => {
+    const file = uploadedFiles.find(f => f.id === fileId);
+    if (!file || !file.data) return;
+
+    // Update status to analysing
+    setUploadedFiles(prev => {
+      const updated = prev.map(f => 
+        f.id === fileId ? { ...f, status: 'analysing' as const } : f
+      );
+      saveFiles(updated);
+      return updated;
+    });
+
+    try {
+      // For now, simulate the analysis with dynamic data based on the CSV
+      // TODO: Connect to real dataAnalysisTool when API integration is ready
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const csvLines = file.data.split('\n');
+      const headers = csvLines[0]?.split(',') || [];
+      const rowCount = csvLines.length - 1;
+      
+      // Generate dynamic analysis based on actual CSV data
+      const analysisResult = {
+        keyFindings: [
+          `Dataset contains ${rowCount} rows with ${headers.length} columns`,
+          `Columns identified: ${headers.slice(0, 3).join(', ')}${headers.length > 3 ? '...' : ''}`,
+          'Data structure analysis completed successfully'
+        ],
+        recommendations: [
+          'Review data quality and completeness',
+          'Consider additional data validation rules',
+          'Implement regular data monitoring'
+        ],
+        visualisations: [
+          { type: 'line', title: 'Trend Analysis', data: 'trend_data' },
+          { type: 'bar', title: 'Category Breakdown', data: 'category_data' },
+          { type: 'scatter', title: 'Correlation Matrix', data: 'correlation_data' }
+        ],
+        confidence: 0.85,
+        dataQuality: rowCount > 100 ? 'High' : 'Medium',
+        processedRows: rowCount
+      };
+
+      // Update file with analysis result
+      setUploadedFiles(prev => {
+        const updated = prev.map(f => 
+          f.id === fileId ? { 
+            ...f, 
+            status: 'processed' as const, 
+            insights: analysisResult.keyFindings.length,
+            analysisResult 
+          } : f
+        );
+        saveFiles(updated);
+        return updated;
+      });
+
+      setSelectedFile(fileId);
+      
+      // Scroll to analysis results
+      setTimeout(() => {
+        const analysisElement = document.querySelector('[data-analysis-result]');
+        if (analysisElement) {
+          analysisElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Analysis error:', error);
+      setUploadedFiles(prev => {
+        const updated = prev.map(f => 
+          f.id === fileId ? { ...f, status: 'error' as const } : f
+        );
+        saveFiles(updated);
+        return updated;
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
       {/* Upload Area */}
       <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
         <h2 className="text-xl font-semibold text-neutral-900 mb-4">CSV Data Analysis</h2>
-        <div className="border-2 border-dashed border-neutral-300 rounded-lg p-8 text-center hover:border-primary-500 transition-colors">
+        <div 
+          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+            dragActive ? 'border-primary-500 bg-primary-50' : 'border-neutral-300 hover:border-primary-500'
+          }`}
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+        >
           <div className="text-4xl mb-4">📊</div>
           <h3 className="text-lg font-medium text-neutral-900 mb-2">Upload CSV Files</h3>
           <p className="text-neutral-600 mb-4">Drag and drop your CSV files here or click to browse</p>
-          <button className="mercury-button">Choose Files</button>
+          <input
+            type="file"
+            id="csv-upload"
+            multiple
+            accept=".csv"
+            onChange={handleFileInputChange}
+            className="hidden"
+          />
+          <label 
+            htmlFor="csv-upload"
+            className="mercury-button cursor-pointer"
+          >
+            {isUploading ? 'Uploading...' : 'Choose Files'}
+          </label>
         </div>
       </div>
 
@@ -920,29 +1169,168 @@ function DataTab() {
       <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
         <h3 className="text-lg font-semibold text-neutral-900 mb-4">Uploaded Files</h3>
         <div className="space-y-3">
-          {uploadedFiles.map((file, index) => (
-            <div key={index} className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-                  <span className="text-primary-600">📄</span>
-                </div>
-                <div>
-                  <p className="font-medium text-neutral-900">{file.name}</p>
-                  <p className="text-sm text-neutral-600">{file.size} • {file.insights} insights</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  file.status === 'processed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {file.status === 'analysing' ? 'analysing' : file.status}
-                </span>
-                <button className="text-primary-600 hover:text-primary-700">Analyse</button>
-              </div>
+          {uploadedFiles.length === 0 ? (
+            <div className="text-center py-8 text-neutral-500">
+              <p>No files uploaded yet</p>
+              <p className="text-sm">Upload CSV files to get started with analysis</p>
             </div>
-          ))}
+          ) : (
+            uploadedFiles.map((file) => (
+              <div key={file.id} className="flex items-center justify-between p-4 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                    <span className="text-primary-600">📄</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-neutral-900">{file.name}</p>
+                    <p className="text-sm text-neutral-600">
+                      {file.size} • {file.insights} insights • 
+                      {new Date(file.uploadedAt).toLocaleDateString('en-GB')}
+                    </p>
+                  </div>
+                </div>
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            file.status === 'processed' ? 'bg-green-100 text-green-800' : 
+                            file.status === 'analysing' ? 'bg-yellow-100 text-yellow-800' :
+                            file.status === 'error' ? 'bg-red-100 text-red-800' :
+                            'bg-blue-100 text-blue-800'
+                          }`}>
+                            {file.status}
+                          </span>
+                          {file.status === 'processed' ? (
+                            <button 
+                              onClick={() => {
+                                setSelectedFile(file.id);
+                                // Scroll to analysis results
+                                setTimeout(() => {
+                                  const analysisElement = document.querySelector('[data-analysis-result]');
+                                  if (analysisElement) {
+                                    analysisElement.scrollIntoView({ 
+                                      behavior: 'smooth', 
+                                      block: 'start' 
+                                    });
+                                  }
+                                }, 100);
+                              }}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              View Analysis
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => analyseFile(file.id)}
+                              disabled={file.status === 'analysing'}
+                              className="text-primary-600 hover:text-primary-700 disabled:text-neutral-400 disabled:cursor-not-allowed"
+                            >
+                              {file.status === 'analysing' ? 'Analysing...' : 'Analyse'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deleteFile(file.id)}
+                            className="text-red-500 hover:text-red-700 p-1"
+                            title="Delete file"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
+
+      {/* Analysis Results */}
+      {selectedFile && (() => {
+        const file = uploadedFiles.find(f => f.id === selectedFile);
+        if (!file?.analysisResult) return null;
+        
+  return (
+          <div className="bg-white rounded-xl shadow-lg border border-neutral-200 overflow-hidden" data-analysis-result>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xl font-bold text-white">Analysis Results</h3>
+                  <p className="text-primary-100 text-sm">{file.name}</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-white text-sm">Confidence: {Math.round(file.analysisResult.confidence * 100)}%</div>
+                  <div className="text-primary-100 text-xs">Data Quality: {file.analysisResult.dataQuality}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              {/* Key Findings */}
+              <div className="mb-8">
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-1 h-6 bg-primary-500 rounded"></div>
+                  <h4 className="text-lg font-semibold text-neutral-900">Key Findings</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {file.analysisResult.keyFindings.map((finding: string, index: number) => (
+                    <div key={index} className="flex items-start space-x-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex-shrink-0 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-sm font-bold">{index + 1}</span>
+                      </div>
+                      <p className="text-neutral-700 leading-relaxed">{finding}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recommendations */}
+              <div className="mb-8">
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-1 h-6 bg-primary-500 rounded"></div>
+                  <h4 className="text-lg font-semibold text-neutral-900">Recommendations</h4>
+                </div>
+                <div className="space-y-3">
+                  {file.analysisResult.recommendations.map((recommendation: string, index: number) => (
+                    <div key={index} className="flex items-start space-x-3 p-4 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex-shrink-0 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-sm font-bold">✓</span>
+                      </div>
+                      <p className="text-neutral-700 leading-relaxed">{recommendation}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Visualisations */}
+              <div>
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-1 h-6 bg-primary-500 rounded"></div>
+                  <h4 className="text-lg font-semibold text-neutral-900">Suggested Visualisations</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {file.analysisResult.visualisations.map((viz: any, index: number) => (
+                    <div key={index} className="p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                      <div className="text-center">
+                        <div className="text-2xl mb-2">
+                          {viz.type === 'line' ? '📈' : viz.type === 'bar' ? '📊' : '🥧'}
+                        </div>
+                        <h5 className="font-medium text-neutral-900">{viz.title}</h5>
+                        <p className="text-sm text-neutral-600 capitalize">{viz.type} chart</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-neutral-50 px-6 py-3 border-t border-neutral-200">
+              <div className="flex items-center justify-between text-sm text-neutral-500">
+                <span>Processed {file.analysisResult.processedRows} rows</span>
+                <span>Powered by Mercury CI Analysis Engine</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
