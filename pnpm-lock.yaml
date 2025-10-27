@@ -50,6 +50,9 @@ importers:
       dotenv:
         specifier: ^17.2.3
         version: 17.2.3
+      jszip:
+        specifier: ^3.10.1
+        version: 3.10.1
       libsql:
         specifier: ^0.5.22
         version: 0.5.22

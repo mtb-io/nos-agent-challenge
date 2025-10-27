@@ -3,7 +3,33 @@
 import { useState, useEffect } from "react";
 import { CopilotSidebar } from "@copilotkit/react-ui";
 import { useRouter } from "next/navigation";
-import * as pdfjsLib from 'pdfjs-dist';
+import JSZip from 'jszip';
+
+// Dynamic PDF.js import to avoid SSR issues
+let pdfjsLib: any = null;
+
+// Function to load PDF.js dynamically
+const loadPDFJS = async () => {
+  if (!pdfjsLib) {
+    const pdfjs = await import('pdfjs-dist');
+    pdfjsLib = pdfjs;
+    // Configure PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+  }
+  return pdfjsLib;
+};
+
+// Helper function to extract text from XML
+function extractTextFromXML(xml: string): string {
+  const textMatches = xml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+  if (textMatches) {
+    return textMatches
+      .map(match => match.replace(/<w:t[^>]*>([^<]*)<\/w:t>/, '$1'))
+      .join(' ')
+      .trim();
+  }
+  return 'No text content found in document';
+}
 
 // Briefing storage utilities
 interface StoredBriefing {
@@ -892,7 +918,7 @@ function BriefingHistorySidebar({
                         <p className="text-xs text-neutral-500">
                           {new Date(briefing.date).toLocaleDateString('en-GB')} • {briefing.sources.join(', ')}
                         </p>
-          </div>
+      </div>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1482,6 +1508,7 @@ function DataTab() {
           file.type === 'application/pdf' ||
           file.type === 'application/msword' ||
           file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        
         const fileId = `file-${Date.now()}-${i}`;
         const fileSize = (file.size / 1024 / 1024).toFixed(1) + 'MB';
         
@@ -1491,18 +1518,18 @@ function DataTab() {
             let content = '';
             
             if (fileExtension === 'csv' || fileExtension === 'txt') {
-              // Read text files as before
-              const reader = new FileReader();
-              reader.onload = (e) => {
-                content = e.target?.result as string || '';
-                processFile();
-              };
-              reader.readAsText(file);
+              // Read text files synchronously
+              content = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target?.result as string || '');
+                reader.readAsText(file);
+              });
             } else if (fileExtension === 'pdf') {
               // Extract text from PDF using pdfjs-dist
               const arrayBuffer = await file.arrayBuffer();
               try {
-                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                const pdfjs = await loadPDFJS();
+                const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
                 const pdf = await loadingTask.promise;
                 let fullText = '';
                 
@@ -1520,45 +1547,53 @@ function DataTab() {
                 console.warn('PDF extraction failed:', pdfError);
                 content = `[PDF file - ${file.name}] - Error extracting content: ${pdfError instanceof Error ? pdfError.message : 'Unknown error'}`;
               }
-              processFile();
-            } else if (fileExtension === 'doc' || fileExtension === 'docx') {
-              // For Word documents, provide a helpful message about processing
-              content = `[${fileExtension.toUpperCase()} file - ${file.name}] - Word document processing is currently being improved. The document has been uploaded successfully but content extraction requires additional configuration. This is a ${fileExtension.toUpperCase()} document that would typically contain text, formatting, and potentially images or tables. Mercury CI is working on enhanced Word document processing capabilities. File size: ${(file.size / 1024 / 1024).toFixed(1)}MB.`;
-              processFile();
+            } else if (fileExtension === 'docx') {
+              // Extract text from DOCX using jszip
+              try {
+                const arrayBuffer = await file.arrayBuffer();
+                const zip = await JSZip.loadAsync(arrayBuffer);
+                const documentXml = await zip.file('word/document.xml')?.async('string');
+                if (documentXml) {
+                  content = extractTextFromXML(documentXml);
+                } else {
+                  content = 'No document content found in DOCX file';
+                }
+              } catch (docError) {
+                console.warn('DOCX extraction failed:', docError);
+                content = `[DOCX file - ${file.name}] - Error extracting content: ${docError instanceof Error ? docError.message : 'Unknown error'}`;
+              }
+            } else if (fileExtension === 'doc') {
+              // For legacy DOC files
+              content = `[DOC file - ${file.name}] - Legacy Word document format. Please convert to DOCX for better processing. File size: ${(file.size / 1024 / 1024).toFixed(1)}MB.`;
             } else {
-              // For other file types, store placeholder
+              // For other file types
               content = `[${fileExtension?.toUpperCase()} file - ${file.name}] - Content extraction not available for this file type. File uploaded for reference.`;
-              processFile();
             }
             
-            function processFile() {
-              console.log('File uploaded:', file.name, 'Type:', fileExtension, 'Size:', fileSize, 'Content length:', content.length);
-              setUploadedFiles(prev => {
-                const newFile = {
-                  id: fileId,
-                  name: file.name,
-                  size: fileSize,
-                  status: 'uploaded' as const,
-                  insights: 0,
-                  data: content,
-                  uploadedAt: new Date().toISOString()
-                };
-                const newFiles = [...prev, newFile];
-                
-                // Keep only the most recent files
-                if (newFiles.length > MAX_FILES) {
-                  newFiles.splice(0, newFiles.length - MAX_FILES);
-                }
-                
-                console.log('Updated files:', newFiles);
-                saveFiles(newFiles);
-                return newFiles;
-              });
-              resolve();
-            }
+            // Process the file after content is read
+            console.log('File uploaded:', file.name, 'Type:', fileExtension, 'Size:', fileSize, 'Content length:', content.length);
+            setUploadedFiles(prev => {
+              const newFile = {
+                id: fileId,
+                name: file.name,
+                size: fileSize,
+                status: 'uploaded' as const,
+                insights: 0,
+                data: content,
+                uploadedAt: new Date().toISOString()
+              };
+              const newFiles = [...prev, newFile];
+              
+              if (newFiles.length > MAX_FILES) {
+                newFiles.splice(0, newFiles.length - MAX_FILES);
+              }
+              
+              saveFiles(newFiles);
+              return newFiles;
+            });
+            resolve();
           } catch (error) {
             console.error('Error processing file:', file.name, error);
-            // Fallback to placeholder content
             const errorContent = `[${fileExtension?.toUpperCase()} file - ${file.name}] - Error extracting content: ${error instanceof Error ? error.message : 'Unknown error'}`;
             setUploadedFiles(prev => {
               const newFile = {
@@ -1720,8 +1755,8 @@ function DataTab() {
           >
             {isUploading ? 'Uploading...' : 'Choose Files'}
           </label>
+          </div>
         </div>
-      </div>
 
       {/* File List */}
       <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
@@ -1755,7 +1790,7 @@ function DataTab() {
                             'bg-blue-100 text-blue-800'
                           }`}>
                             {file.status}
-                          </span>
+            </span>
                           {file.status === 'processed' ? (
                             <button 
                               onClick={() => {
@@ -1791,12 +1826,12 @@ function DataTab() {
                           >
                             🗑️
                           </button>
-                        </div>
+          </div>
               </div>
             ))
           )}
         </div>
-      </div>
+        </div>
 
       {/* Analysis Results */}
       {selectedFile && (() => {
@@ -1808,14 +1843,14 @@ function DataTab() {
             {/* Header */}
             <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-6 py-4">
               <div className="flex items-center justify-between">
-                <div>
+            <div>
                   <h3 className="text-xl font-bold text-white">Analysis Results</h3>
                   <p className="text-primary-100 text-sm">{file.name}</p>
-                </div>
+            </div>
                 <div className="text-right">
                   <div className="text-white text-sm">Confidence: {Math.round(file.analysisResult.confidence * 100)}%</div>
                   <div className="text-primary-100 text-xs">Data Quality: {file.analysisResult.dataQuality}</div>
-                </div>
+            </div>
               </div>
             </div>
 
@@ -1869,22 +1904,22 @@ function DataTab() {
               </div>
 
               {/* Visualisations */}
-              <div>
+            <div>
                 <div className="flex items-center space-x-2 mb-4">
                   <div className="w-1 h-6 bg-primary-500 rounded"></div>
                   <h4 className="text-lg font-semibold text-neutral-900">Suggested Visualisations</h4>
-                </div>
+            </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {file.analysisResult.visualisations.map((viz: any, index: number) => (
                     <div key={index} className="p-4 bg-neutral-50 rounded-lg border border-neutral-200">
                       <div className="text-center">
                         <div className="text-2xl mb-2">
                           {viz.type === 'line' ? '📈' : viz.type === 'bar' ? '📊' : '🥧'}
-                        </div>
+          </div>
                         <h5 className="font-medium text-neutral-900">{viz.title}</h5>
                         <p className="text-sm text-neutral-600 capitalize">{viz.type} chart</p>
-                      </div>
-                    </div>
+        </div>
+      </div>
                   ))}
                 </div>
               </div>

@@ -30,6 +30,7 @@
     "@mastra/memory": "0.15.4",
     "docx-preview": "^0.3.7",
     "dotenv": "^17.2.3",
+    "jszip": "^3.10.1",
     "libsql": "^0.5.22",
     "mastra": "0.13.4",
     "next": ">=15.5.4",
