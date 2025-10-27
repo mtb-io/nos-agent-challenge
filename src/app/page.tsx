@@ -142,6 +142,109 @@ const generateHumanSummary = (docType: string, wordCount: number, emails: string
   return parts.join(' ') + '.';
 };
 
+// Generate practical visualizations and actionable insights
+const generatePracticalVisualizations = (docType: string, emails: string[], phones: string[], postcodes: string[], currencies: string[], niNumbers: string[], dates: string[]) => {
+  const visualizations = [];
+  
+  // Contact Information Table
+  if (emails.length > 0 || phones.length > 0) {
+    visualizations.push({
+      type: 'table',
+      title: 'Contact Information',
+      description: 'Extracted emails and phone numbers for CRM import',
+      icon: '📞',
+      data: {
+        emails: emails,
+        phones: phones,
+        exportable: true
+      }
+    });
+  }
+  
+  // Geographic Information
+  if (postcodes.length > 0) {
+    visualizations.push({
+      type: 'map',
+      title: 'Geographic Distribution',
+      description: 'UK postcodes for location analysis',
+      icon: '🗺️',
+      data: {
+        postcodes: postcodes,
+        count: postcodes.length
+      }
+    });
+  }
+  
+  // Financial Information
+  if (currencies.length > 0) {
+    visualizations.push({
+      type: 'currency',
+      title: 'Financial Data',
+      description: 'Currency amounts found in document',
+      icon: '💰',
+      data: {
+        amounts: currencies,
+        count: currencies.length
+      }
+    });
+  }
+  
+  // Compliance Alerts
+  const complianceFlags = [];
+  if (niNumbers.length > 0) {
+    complianceFlags.push('Contains National Insurance numbers');
+  }
+  if (currencies.length > 0) {
+    complianceFlags.push('Contains financial amounts');
+  }
+  if (emails.length > 0) {
+    complianceFlags.push('Contains personal email addresses');
+  }
+  
+  if (complianceFlags.length > 0) {
+    visualizations.push({
+      type: 'alert',
+      title: 'Compliance Flags',
+      description: 'Sensitive data requiring attention',
+      icon: '⚠️',
+      data: {
+        flags: complianceFlags,
+        severity: niNumbers.length > 0 ? 'high' : 'medium'
+      }
+    });
+  }
+  
+  // Document Timeline
+  if (dates.length > 0) {
+    visualizations.push({
+      type: 'timeline',
+      title: 'Document Timeline',
+      description: 'Dates found for chronological tracking',
+      icon: '📅',
+      data: {
+        dates: dates,
+        count: dates.length
+      }
+    });
+  }
+  
+  // Default visualization if no specific data
+  if (visualizations.length === 0) {
+    visualizations.push({
+      type: 'info',
+      title: 'Document Overview',
+      description: 'Basic document information',
+      icon: '📄',
+      data: {
+        type: docType,
+        wordCount: 0
+      }
+    });
+  }
+  
+  return visualizations;
+};
+
 // Enhanced AI-powered document analysis
 const analyzeDocumentStructured = async (fileName: string, fileExtension: string, content: string) => {
   const analysisPrompt = `You are a precise Business Document Analyst. 
@@ -339,11 +442,7 @@ HUMAN SUMMARY:
         'Check for any missing information',
         'Consider document-specific workflows'
       ],
-      visualisations: [
-        { type: 'bar', title: 'Entity Distribution', description: 'Show count of different entity types' },
-        { type: 'pie', title: 'Document Classification', description: 'Display document type breakdown' },
-        { type: 'scatter', title: 'Entity Relationships', description: 'Visualize connections between entities' }
-      ],
+      visualisations: generatePracticalVisualizations(docType, emails, phones, postcodes, currencies, niNumbers, dates),
       confidence: 0.85,
       dataQuality: 'High',
       processedRows: wordCount
@@ -1815,6 +1914,97 @@ function DataTab() {
     }
   };
 
+  // Export data functions
+  const exportData = (analysisResult: any, format: 'csv' | 'json') => {
+    if (format === 'csv') {
+      // Export contacts as CSV
+      const contacts: Array<{type: string, value: string, source: string}> = [];
+      if (analysisResult.entities?.emails?.length > 0) {
+        analysisResult.entities.emails.forEach((email: string) => {
+          contacts.push({ type: 'Email', value: email, source: analysisResult.title });
+        });
+      }
+      if (analysisResult.entities?.phones?.length > 0) {
+        analysisResult.entities.phones.forEach((phone: string) => {
+          contacts.push({ type: 'Phone', value: phone, source: analysisResult.title });
+        });
+      }
+      
+      if (contacts.length > 0) {
+        const csvContent = 'Type,Value,Source\n' + contacts.map(c => `${c.type},${c.value},${c.source}`).join('\n');
+        downloadFile(csvContent, 'contacts.csv', 'text/csv');
+      } else {
+        alert('No contact information to export');
+      }
+    } else if (format === 'json') {
+      // Export full analysis as JSON
+      const jsonContent = JSON.stringify(analysisResult, null, 2);
+      downloadFile(jsonContent, 'analysis.json', 'application/json');
+    }
+  };
+
+  const downloadFile = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const flagForReview = (analysisResult: any) => {
+    // Check for sensitive data
+    const sensitiveData = [];
+    if (analysisResult.entities?.ni_numbers?.length > 0) {
+      sensitiveData.push('National Insurance numbers');
+    }
+    if (analysisResult.entities?.vat_numbers?.length > 0) {
+      sensitiveData.push('VAT numbers');
+    }
+    if (analysisResult.entities?.account_numbers?.length > 0) {
+      sensitiveData.push('Account numbers');
+    }
+    
+    if (sensitiveData.length > 0) {
+      alert(`⚠️ Flagged for Review\n\nThis document contains sensitive data:\n• ${sensitiveData.join('\n• ')}\n\nPlease ensure proper handling and compliance.`);
+    } else {
+      alert('✅ Document flagged for review\n\nNo sensitive data detected, but document has been flagged for manual review.');
+    }
+  };
+
+  const addToCRM = (analysisResult: any) => {
+    const contacts: Array<{type: string, value: string}> = [];
+    if (analysisResult.entities?.emails?.length > 0) {
+      analysisResult.entities.emails.forEach((email: string) => {
+        contacts.push({ type: 'Email', value: email });
+      });
+    }
+    if (analysisResult.entities?.phones?.length > 0) {
+      analysisResult.entities.phones.forEach((phone: string) => {
+        contacts.push({ type: 'Phone', value: phone });
+      });
+    }
+    
+    if (contacts.length > 0) {
+      // Simulate CRM integration
+      const contactData = {
+        name: analysisResult.recipient || analysisResult.issuer || 'Unknown Contact',
+        documentType: analysisResult.docType,
+        contacts: contacts,
+        source: analysisResult.title,
+        flagged: analysisResult.entities?.ni_numbers?.length > 0 || analysisResult.entities?.vat_numbers?.length > 0
+      };
+      
+      console.log('CRM Integration Data:', contactData);
+      alert(`👥 Added to CRM\n\nContact: ${contactData.name}\nType: ${contactData.documentType}\nContacts: ${contacts.length} found\n\nData ready for CRM import.`);
+    } else {
+      alert('No contact information found to add to CRM');
+    }
+  };
+
   // Handle file upload
   const handleFileUpload = async (files: FileList) => {
     setIsUploading(true);
@@ -2167,20 +2357,20 @@ function DataTab() {
           <div className="bg-white rounded-xl shadow-lg border border-neutral-200 overflow-hidden" data-analysis-result>
             {/* Header */}
             <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-6 py-4">
-              <div className="flex items-center justify-between">
-            <div>
+        <div className="flex items-center justify-between">
+          <div>
                   <h3 className="text-xl font-bold text-white">Document Analysis</h3>
                   <p className="text-primary-100 text-sm">{file.name}</p>
                   {file.analysisResult.docType && (
                     <p className="text-primary-100 text-xs">Type: {file.analysisResult.docType}</p>
                   )}
-            </div>
+          </div>
                 <div className="text-right">
                   <div className="text-white text-sm">Confidence: {Math.round((file.analysisResult.confidence || 0.9) * 100)}%</div>
                   <div className="text-primary-100 text-xs">Quality: {file.analysisResult.quality || file.analysisResult.dataQuality || 'High'}</div>
             </div>
               </div>
-            </div>
+        </div>
 
             {/* Content */}
             <div className="p-6">
@@ -2192,12 +2382,12 @@ function DataTab() {
                     <div className="p-3 bg-blue-50 rounded-lg">
                       <p className="text-sm text-blue-600 font-medium">Type</p>
                       <p className="text-blue-900 font-semibold">{file.analysisResult.docType}</p>
-                    </div>
+          </div>
                     {file.analysisResult.issuer && (
                       <div className="p-3 bg-green-50 rounded-lg">
                         <p className="text-sm text-green-600 font-medium">Issuer</p>
                         <p className="text-green-900 font-semibold">{file.analysisResult.issuer}</p>
-                      </div>
+        </div>
                     )}
                     {file.analysisResult.recipient && (
                       <div className="p-3 bg-purple-50 rounded-lg">
@@ -2294,24 +2484,132 @@ function DataTab() {
                 </div>
               )}
 
-              {/* Visualisations */}
+              {/* Action Buttons */}
+              <div className="mb-6">
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-1 h-6 bg-primary-500 rounded"></div>
+                  <h4 className="text-lg font-semibold text-neutral-900">Actions</h4>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button 
+                    onClick={() => exportData(file.analysisResult, 'csv')}
+                    className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2"
+                  >
+                    <span>📊</span>
+                    <span>Export CSV</span>
+                  </button>
+                  <button 
+                    onClick={() => exportData(file.analysisResult, 'json')}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2"
+                  >
+                    <span>📄</span>
+                    <span>Export JSON</span>
+                  </button>
+                  <button 
+                    onClick={() => flagForReview(file.analysisResult)}
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center space-x-2"
+                  >
+                    <span>⚠️</span>
+                    <span>Flag for Review</span>
+                  </button>
+                  <button 
+                    onClick={() => addToCRM(file.analysisResult)}
+                    className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center space-x-2"
+                  >
+                    <span>👥</span>
+                    <span>Add to CRM</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Practical Visualisations */}
               {file.analysisResult.visualisations && (
             <div>
                   <div className="flex items-center space-x-2 mb-4">
                     <div className="w-1 h-6 bg-primary-500 rounded"></div>
-                    <h4 className="text-lg font-semibold text-neutral-900">Suggested Visualisations</h4>
+                    <h4 className="text-lg font-semibold text-neutral-900">Data Insights</h4>
             </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {file.analysisResult.visualisations.map((viz: any, index: number) => (
                       <div key={index} className="p-4 bg-neutral-50 rounded-lg border border-neutral-200">
-                        <div className="text-center">
-                          <div className="text-2xl mb-2">
-                            {viz.type === 'line' ? '📈' : viz.type === 'bar' ? '📊' : viz.type === 'pie' ? '🥧' : '📊'}
+                        <div className="flex items-start space-x-3">
+                          <div className="text-2xl">{viz.icon}</div>
+                          <div className="flex-1">
+                            <h5 className="font-medium text-neutral-900 mb-1">{viz.title}</h5>
+                            <p className="text-sm text-neutral-600 mb-3">{viz.description}</p>
+                            
+                            {/* Render different visualization types */}
+                            {viz.type === 'table' && (
+                              <div className="space-y-2">
+                                {viz.data.emails?.length > 0 && (
+            <div>
+                                    <p className="text-xs font-medium text-neutral-500">Email Addresses:</p>
+                                    {viz.data.emails.map((email: string, i: number) => (
+                                      <p key={i} className="text-sm text-neutral-700 bg-white px-2 py-1 rounded">{email}</p>
+                                    ))}
+            </div>
+                                )}
+                                {viz.data.phones?.length > 0 && (
+            <div>
+                                    <p className="text-xs font-medium text-neutral-500">Phone Numbers:</p>
+                                    {viz.data.phones.map((phone: string, i: number) => (
+                                      <p key={i} className="text-sm text-neutral-700 bg-white px-2 py-1 rounded">{phone}</p>
+                                    ))}
+            </div>
+                                )}
           </div>
-                          <h5 className="font-medium text-neutral-900">{viz.title}</h5>
-                          <p className="text-sm text-neutral-600 capitalize">{viz.type} chart</p>
+                            )}
+                            
+                            {viz.type === 'map' && (
+                              <div>
+                                <p className="text-xs font-medium text-neutral-500">UK Postcodes ({viz.data.count}):</p>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {viz.data.postcodes.map((postcode: string, i: number) => (
+                                    <span key={i} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">{postcode}</span>
+                                  ))}
         </div>
       </div>
+                            )}
+                            
+                            {viz.type === 'currency' && (
+                              <div>
+                                <p className="text-xs font-medium text-neutral-500">Currency Amounts ({viz.data.count}):</p>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {viz.data.amounts.map((amount: string, i: number) => (
+                                    <span key={i} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">{amount}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {viz.type === 'alert' && (
+                              <div>
+                                <p className="text-xs font-medium text-neutral-500">Compliance Flags:</p>
+                                <div className="space-y-1 mt-1">
+                                  {viz.data.flags.map((flag: string, i: number) => (
+                                    <div key={i} className={`text-xs px-2 py-1 rounded ${
+                                      viz.data.severity === 'high' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                                    }`}>
+                                      {flag}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {viz.type === 'timeline' && (
+                              <div>
+                                <p className="text-xs font-medium text-neutral-500">Dates Found ({viz.data.count}):</p>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {viz.data.dates.map((date: string, i: number) => (
+                                    <span key={i} className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded">{date}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
