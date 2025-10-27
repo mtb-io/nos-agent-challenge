@@ -4,11 +4,97 @@ import { useState, useEffect } from "react";
 import { CopilotSidebar } from "@copilotkit/react-ui";
 import { useRouter } from "next/navigation";
 
+// Briefing storage utilities
+interface StoredBriefing {
+  id: string;
+  date: string;
+  company?: string;
+  sources: string[];
+  briefing: string;
+  kpis: any[];
+  insights: string[];
+  generatedAt: string;
+  title: string;
+  archivedAt?: string;
+}
+
+const BRIEFING_STORAGE_KEY = 'mercury-briefings';
+const BRIEFING_ARCHIVE_KEY = 'mercury-briefings-archive';
+const MAX_BRIEFINGS = 20;
+const ARCHIVE_DAYS = 30;
+
+const saveBriefing = (briefing: StoredBriefing) => {
+  const briefings = getStoredBriefings();
+  briefings.unshift(briefing); // Add to beginning
+  
+  // Keep only the most recent 20 briefings
+  if (briefings.length > MAX_BRIEFINGS) {
+    const toArchive = briefings.splice(MAX_BRIEFINGS);
+    archiveBriefings(toArchive);
+  }
+  
+  console.log('Saving briefing:', briefing);
+  console.log('All briefings after save:', briefings);
+  localStorage.setItem(BRIEFING_STORAGE_KEY, JSON.stringify(briefings));
+};
+
+const getStoredBriefings = (): StoredBriefing[] => {
+  try {
+    const stored = localStorage.getItem(BRIEFING_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+const archiveBriefings = (briefings: StoredBriefing[]) => {
+  const archived = getArchivedBriefings();
+  const now = new Date().toISOString();
+  
+  briefings.forEach(briefing => {
+    briefing.archivedAt = now;
+  });
+  
+  archived.push(...briefings);
+  localStorage.setItem(BRIEFING_ARCHIVE_KEY, JSON.stringify(archived));
+};
+
+const getArchivedBriefings = (): StoredBriefing[] => {
+  try {
+    const stored = localStorage.getItem(BRIEFING_ARCHIVE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+const cleanupArchivedBriefings = () => {
+  const archived = getArchivedBriefings();
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - ARCHIVE_DAYS);
+  
+  const validArchived = archived.filter(briefing => 
+    new Date(briefing.archivedAt || briefing.generatedAt) > cutoffDate
+  );
+  
+  localStorage.setItem(BRIEFING_ARCHIVE_KEY, JSON.stringify(validArchived));
+};
+
+const deleteBriefing = (id: string) => {
+  const briefings = getStoredBriefings();
+  const filtered = briefings.filter(b => b.id !== id);
+  localStorage.setItem(BRIEFING_STORAGE_KEY, JSON.stringify(filtered));
+  return filtered;
+};
+
 export default function MercuryCIPage() {
   const [activeTab, setActiveTab] = useState('briefing');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [briefings, setBriefings] = useState<StoredBriefing[]>([]);
+  const [showBriefingSidebar, setShowBriefingSidebar] = useState(false);
+  const [selectedBriefing, setSelectedBriefing] = useState<StoredBriefing | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -31,6 +117,20 @@ export default function MercuryCIPage() {
 
     checkAuth();
   }, [router]);
+
+  // Load briefings and cleanup archived ones
+  useEffect(() => {
+    const loadBriefings = () => {
+      const storedBriefings = getStoredBriefings();
+      console.log('Loaded briefings:', storedBriefings);
+      setBriefings(storedBriefings);
+      
+      // Cleanup archived briefings older than 30 days
+      cleanupArchivedBriefings();
+    };
+
+    loadBriefings();
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('mercury-auth');
@@ -144,7 +244,16 @@ export default function MercuryCIPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {activeTab === 'briefing' && <BriefingTab />}
+        {activeTab === 'briefing' && (
+          <BriefingTab 
+            briefings={briefings}
+            setBriefings={setBriefings}
+            showBriefingSidebar={showBriefingSidebar}
+            setShowBriefingSidebar={setShowBriefingSidebar}
+            selectedBriefing={selectedBriefing}
+            setSelectedBriefing={setSelectedBriefing}
+          />
+        )}
         {activeTab === 'data' && <DataTab />}
         {activeTab === 'artifacts' && <ArtifactsTab />}
       </main>
@@ -172,6 +281,21 @@ export default function MercuryCIPage() {
         </div>
       </footer>
 
+      {/* Briefing History Sidebar */}
+      <BriefingHistorySidebar
+        briefings={briefings}
+        showSidebar={showBriefingSidebar}
+        setShowSidebar={setShowBriefingSidebar}
+        loadBriefing={(briefing) => {
+          console.log('Setting selected briefing:', briefing);
+          setSelectedBriefing(briefing);
+        }}
+        deleteBriefingById={(id) => {
+          const updatedBriefings = deleteBriefing(id);
+          setBriefings(updatedBriefings);
+        }}
+      />
+
       <CopilotSidebar
         clickOutsideToClose={false}
         defaultOpen={true}
@@ -186,11 +310,28 @@ export default function MercuryCIPage() {
 }
 
 // Briefing Tab Component
-function BriefingTab() {
+function BriefingTab({ 
+  briefings, 
+  setBriefings, 
+  showBriefingSidebar, 
+  setShowBriefingSidebar,
+  selectedBriefing,
+  setSelectedBriefing
+}: { 
+  briefings: StoredBriefing[], 
+  setBriefings: (briefings: StoredBriefing[]) => void,
+  showBriefingSidebar: boolean,
+  setShowBriefingSidebar: (show: boolean) => void,
+  selectedBriefing: StoredBriefing | null,
+  setSelectedBriefing: (briefing: StoredBriefing | null) => void
+}) {
   const [selectedSources, setSelectedSources] = useState(['news', 'market']);
   const [briefingDate, setBriefingDate] = useState(new Date().toISOString().split('T')[0]);
   const [userName, setUserName] = useState('mtb');
   const [lastBriefingDate, setLastBriefingDate] = useState('25/10/2025');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [briefingResult, setBriefingResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Contextual Greeting Logic
   const getContextualGreeting = () => {
@@ -203,6 +344,144 @@ function BriefingTab() {
     return `Welcome back, ${userName}. It's been ${daysSince} days since your last briefing.`;
   };
 
+  // Load a specific briefing
+  const loadBriefing = (briefing: StoredBriefing | null) => {
+    if (!briefing) return;
+    
+    // Update the briefing content to use proper UK date format
+    const updatedBriefing = briefing.briefing.replace(
+      /# Daily Intelligence Briefing - \d{4}-\d{2}-\d{2}/,
+      `# Daily Intelligence Briefing - ${new Date(briefing.date).toLocaleDateString('en-GB', { 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      })}`
+    );
+    
+    setBriefingResult({
+      briefing: updatedBriefing,
+      kpis: briefing.kpis,
+      insights: briefing.insights,
+      sources: briefing.sources,
+      generatedAt: briefing.generatedAt
+    });
+    setBriefingDate(briefing.date);
+    setSelectedSources(briefing.sources);
+    setShowBriefingSidebar(false);
+  };
+
+  // Watch for selectedBriefing changes from the sidebar
+  useEffect(() => {
+    if (selectedBriefing) {
+      console.log('Loading selected briefing:', selectedBriefing);
+      loadBriefing(selectedBriefing);
+      setSelectedBriefing(null); // Clear after loading
+      
+      // Scroll to the top of the briefing result
+      setTimeout(() => {
+        const briefingElement = document.querySelector('[data-briefing-result]');
+        if (briefingElement) {
+          briefingElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }
+      }, 100); // Small delay to ensure the briefing is rendered
+    }
+  }, [selectedBriefing]);
+
+  // Delete a briefing
+  const deleteBriefingById = (id: string) => {
+    const updatedBriefings = deleteBriefing(id);
+    setBriefings(updatedBriefings);
+    if (briefingResult && briefingResult.id === id) {
+      setBriefingResult(null);
+    }
+  };
+
+  // Generate Briefing Function
+  const generateBriefing = () => {
+    setIsGenerating(true);
+    setError(null);
+    
+    // Simulate the briefing generation with a delay
+    setTimeout(() => {
+      const briefingId = `briefing-${Date.now()}`;
+      const briefingTitle = `Intelligence Briefing - ${new Date(briefingDate).toLocaleDateString('en-GB')}`;
+      
+      const result = {
+        id: briefingId,
+        briefing: `# Daily Intelligence Briefing - ${new Date(briefingDate).toLocaleDateString('en-GB', { 
+          day: 'numeric', 
+          month: 'long', 
+          year: 'numeric' 
+        })}
+
+## Executive Summary
+Good morning! Here's your comprehensive intelligence briefing for ${userName} covering the latest market developments, key metrics, and strategic insights.
+
+## Market Overview
+Today's market conditions show mixed signals with technology stocks leading gains while traditional sectors experienced some volatility. Key economic indicators suggest continued growth momentum with inflation remaining within target ranges.
+
+## Key Developments
+- **Technology Sector**: AI and cloud computing stocks saw significant gains following positive earnings reports
+- **Energy Markets**: Oil prices stabilised after recent volatility, with renewable energy investments continuing to grow
+- **Regulatory Updates**: New data protection regulations came into effect, impacting digital businesses
+- **Global Trade**: Supply chain improvements noted across major manufacturing sectors
+
+## Risk Assessment
+- **Medium Risk**: Potential interest rate adjustments in Q4
+- **Low Risk**: Stable employment figures across key markets
+- **High Risk**: Geopolitical tensions in certain regions affecting trade routes
+
+## Strategic Recommendations
+1. Consider increasing exposure to technology and renewable energy sectors
+2. Review data compliance procedures in light of new regulations
+3. Monitor supply chain resilience for critical business operations
+4. Evaluate hedging strategies for currency fluctuations
+
+## Data Sources
+This briefing incorporates data from: ${selectedSources.join(', ')}`,
+        kpis: [
+          { metric: 'Market Sentiment', value: 'Positive', change: '+5%', trend: '↗️' },
+          { metric: 'Volatility Index', value: '18.2', change: '-2.1', trend: '↘️' },
+          { metric: 'Sector Performance', value: 'Tech +3.2%', change: '+1.8%', trend: '↗️' },
+          { metric: 'Economic Confidence', value: '78%', change: '+4%', trend: '↗️' }
+        ],
+        insights: [
+          'Technology sector showing strong momentum with AI investments driving growth',
+          'Renewable energy sector continues to attract significant capital inflows',
+          'Supply chain resilience improving across major manufacturing sectors',
+          'Data protection regulations creating new compliance requirements for digital businesses'
+        ],
+        sources: selectedSources,
+        generatedAt: new Date().toISOString()
+      };
+
+      // Create stored briefing object
+      const storedBriefing: StoredBriefing = {
+        id: briefingId,
+        date: briefingDate,
+        company: userName,
+        sources: selectedSources,
+        briefing: result.briefing,
+        kpis: result.kpis,
+        insights: result.insights,
+        generatedAt: result.generatedAt,
+        title: briefingTitle
+      };
+
+      // Save to storage and update state
+      saveBriefing(storedBriefing);
+      const updatedBriefings = getStoredBriefings();
+      setBriefings(updatedBriefings);
+      
+      setBriefingResult(result);
+      setLastBriefingDate(new Date(briefingDate).toLocaleDateString('en-GB'));
+      setIsGenerating(false);
+    }, 2000); // Simulate 2 second delay
+  };
+
   return (
     <div className="space-y-6">
       {/* Contextual Greeting with Memory Light */}
@@ -210,7 +489,7 @@ function BriefingTab() {
         <div className="flex items-center space-x-3">
           <div className="w-12 h-12 bg-primary-500 rounded-full flex items-center justify-center animate-scale-in">
             <span className="text-white text-xl">👋</span>
-          </div>
+            </div>
           <div>
             <h3 className="text-lg font-semibold text-neutral-900">
               {getContextualGreeting()}
@@ -247,10 +526,23 @@ function BriefingTab() {
         ))}
         </div>
 
-      {/* Generate Briefing Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
-        <h2 className="text-xl font-semibold text-neutral-900 mb-2">Generate Intelligence Briefing</h2>
-        <p className="text-neutral-600 mb-6">Create a comprehensive daily briefing with key insights and metrics</p>
+              {/* Generate Briefing Section */}
+              <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-xl font-semibold text-neutral-900">Generate Intelligence Briefing</h2>
+                  <div className="flex items-center space-x-3">
+                    <span className="text-sm text-neutral-500">
+                      {briefings.length} of {MAX_BRIEFINGS} briefings
+                    </span>
+                    <button
+                      onClick={() => setShowBriefingSidebar(true)}
+                      className="px-3 py-1.5 text-sm bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-lg transition-colors"
+                    >
+                      📋 History
+                    </button>
+                  </div>
+                </div>
+                <p className="text-neutral-600 mb-6">Create a comprehensive daily briefing with key insights and metrics</p>
         
         <div className="space-y-4">
           {/* Briefing Date */}
@@ -305,12 +597,301 @@ function BriefingTab() {
           </div>
 
           {/* Generate Button */}
-          <button className="w-full bg-primary-500 hover:bg-primary-600 text-white font-medium py-3 px-4 rounded-lg transition-colors">
-            Generate Intelligence Briefing
+          <button 
+            onClick={generateBriefing}
+            disabled={isGenerating}
+            className="w-full bg-primary-500 hover:bg-primary-600 disabled:bg-primary-300 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+          >
+            {isGenerating ? 'Generating...' : 'Generate Intelligence Briefing'}
           </button>
         </div>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+          <div className="flex items-center space-x-2">
+            <span className="text-red-500">⚠️</span>
+            <p className="text-red-700 font-medium">Error generating briefing</p>
+          </div>
+          <p className="text-red-600 text-sm mt-1">{error}</p>
+        </div>
+      )}
+
+              {/* Briefing Result */}
+              {briefingResult && (
+                <div className="bg-white rounded-xl shadow-lg border border-neutral-200 overflow-hidden" data-briefing-result>
+          {/* Header */}
+          <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-white">Generated Intelligence Briefing</h3>
+                <p className="text-primary-100 text-sm">Generated on {new Date(briefingResult.generatedAt).toLocaleDateString('en-GB', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</p>
+              </div>
+              <div className="text-right">
+                <div className="text-white text-sm">Data Sources</div>
+                <div className="text-primary-100 text-xs">{briefingResult.sources?.join(' • ') || 'news, market'}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-6">
+            {/* Briefing Content */}
+            <div className="prose prose-lg max-w-none mb-8">
+              <div className="text-neutral-700 leading-relaxed">
+                {(briefingResult.briefing || briefingResult.content || briefingResult.message || 'Briefing generated successfully!')
+                  .split('\n')
+                  .map((line: string, index: number) => {
+                    if (line.startsWith('## ')) {
+                      return (
+                        <h2 key={index} className="text-xl font-bold text-neutral-900 mt-6 mb-3 first:mt-0">
+                          {line.replace('## ', '')}
+                        </h2>
+                      );
+                    } else if (line.startsWith('# ')) {
+                      return (
+                        <h1 key={index} className="text-2xl font-bold text-neutral-900 mt-6 mb-4 first:mt-0">
+                          {line.replace('# ', '')}
+                        </h1>
+                      );
+                    } else if (line.startsWith('- **') && line.includes('**:')) {
+                      const [boldPart, rest] = line.split('**:');
+                      const boldText = boldPart.replace('- **', '');
+                      return (
+                        <div key={index} className="mb-2">
+                          <span className="font-semibold text-neutral-900">{boldText}:</span>
+                          <span className="text-neutral-700">{rest}</span>
+                        </div>
+                      );
+                    } else if (line.startsWith('- ')) {
+                      return (
+                        <div key={index} className="ml-4 mb-2">
+                          <span className="text-neutral-700">{line.replace('- ', '')}</span>
+                        </div>
+                      );
+                    } else if (line.match(/^\d+\./)) {
+                      return (
+                        <div key={index} className="ml-4 mb-2">
+                          <span className="text-neutral-700">{line}</span>
+                        </div>
+                      );
+                    } else if (line.trim() === '') {
+                      return <br key={index} />;
+                    } else {
+                      return (
+                        <p key={index} className="mb-3">
+                          <span className="text-neutral-700">{line}</span>
+                        </p>
+                      );
+                    }
+                  })}
+              </div>
+            </div>
+            
+            {/* KPIs Display */}
+            {briefingResult.kpis && (
+              <div className="mb-8">
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-1 h-6 bg-primary-500 rounded"></div>
+                  <h4 className="text-lg font-semibold text-neutral-900">Key Performance Indicators</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {briefingResult.kpis.map((kpi: any, index: number) => (
+                    <div key={index} className="bg-gradient-to-br from-neutral-50 to-neutral-100 rounded-xl p-4 border border-neutral-200 hover:shadow-md transition-shadow">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium text-neutral-600">{kpi.metric}</p>
+                        <span className="text-lg">{kpi.trend}</span>
+                      </div>
+                      <p className="text-2xl font-bold text-neutral-900 mb-1">{kpi.value}</p>
+                      <p className={`text-sm font-medium ${kpi.change.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
+                        {kpi.change}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Insights Display */}
+            {briefingResult.insights && (
+              <div>
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-1 h-6 bg-primary-500 rounded"></div>
+                  <h4 className="text-lg font-semibold text-neutral-900">Key Insights</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {briefingResult.insights.map((insight: string, index: number) => (
+                    <div key={index} className="flex items-start space-x-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex-shrink-0 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-sm font-bold">{index + 1}</span>
+                      </div>
+                      <p className="text-neutral-700 leading-relaxed">{insight}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="bg-neutral-50 px-6 py-3 border-t border-neutral-200">
+            <div className="flex items-center justify-between text-sm text-neutral-500">
+              <span>Powered by Mercury CI Intelligence Engine</span>
+              <span>Confidence: High • Updated: Real-time</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// Briefing History Sidebar Component
+function BriefingHistorySidebar({ 
+  briefings, 
+  showSidebar, 
+  setShowSidebar, 
+  loadBriefing, 
+  deleteBriefingById 
+}: { 
+  briefings: StoredBriefing[], 
+  showSidebar: boolean, 
+  setShowSidebar: (show: boolean) => void,
+  loadBriefing: (briefing: StoredBriefing | null) => void,
+  deleteBriefingById: (id: string) => void
+}) {
+  const recentBriefings = briefings.slice(0, 5);
+  const allBriefings = briefings;
+
+  return (
+    <>
+      {/* Backdrop */}
+      {showSidebar && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
+      
+      {/* Sidebar */}
+      <div className={`fixed right-0 top-0 h-full w-96 bg-white shadow-xl z-50 transform transition-transform duration-300 ${
+        showSidebar ? 'translate-x-0' : 'translate-x-full'
+      }`}>
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-neutral-200">
+            <h3 className="text-lg font-semibold text-neutral-900">Briefing History</h3>
+            <button
+              onClick={() => setShowSidebar(false)}
+              className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {/* Recent Briefings */}
+            <div className="mb-6">
+              <h4 className="text-sm font-medium text-neutral-600 mb-3">Recent Briefings</h4>
+              <div className="space-y-2">
+                {recentBriefings.map((briefing) => (
+                  <div
+                    key={briefing.id}
+                    className="p-3 bg-neutral-50 rounded-lg border border-neutral-200 hover:bg-neutral-100 transition-colors cursor-pointer"
+                    onClick={() => {
+                      console.log('Clicked briefing:', briefing);
+                      loadBriefing(briefing);
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-neutral-900 truncate">
+                          {briefing.title}
+                        </p>
+                        <p className="text-xs text-neutral-500">
+                          {new Date(briefing.date).toLocaleDateString('en-GB')} • {briefing.sources.join(', ')}
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteBriefingById(briefing.id);
+                        }}
+                        className="ml-2 p-1 text-neutral-400 hover:text-red-500 transition-colors"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* All Briefings */}
+            {allBriefings.length > 5 && (
+              <div>
+                <h4 className="text-sm font-medium text-neutral-600 mb-3">All Briefings</h4>
+                <div className="space-y-2">
+                  {allBriefings.slice(5).map((briefing) => (
+                    <div
+                      key={briefing.id}
+                      className="p-3 bg-neutral-50 rounded-lg border border-neutral-200 hover:bg-neutral-100 transition-colors cursor-pointer"
+                      onClick={() => {
+                      console.log('Clicked briefing:', briefing);
+                      loadBriefing(briefing);
+                    }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-neutral-900 truncate">
+                            {briefing.title}
+                          </p>
+                          <p className="text-xs text-neutral-500">
+                            {new Date(briefing.date).toLocaleDateString('en-GB')} • {briefing.sources.join(', ')}
+                          </p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteBriefingById(briefing.id);
+                          }}
+                          className="ml-2 p-1 text-neutral-400 hover:text-red-500 transition-colors"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {briefings.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-neutral-500 text-sm">No briefings yet</p>
+                <p className="text-neutral-400 text-xs mt-1">Generate your first briefing to get started</p>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="p-6 border-t border-neutral-200">
+            <div className="text-xs text-neutral-500 text-center">
+              Briefings are stored locally and archived after 30 days
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
