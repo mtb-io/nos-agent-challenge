@@ -548,7 +548,31 @@ const cleanupArchivedBriefings = () => {
     new Date(briefing.archivedAt || briefing.generatedAt) > cutoffDate
   );
   
+  const deletedCount = archived.length - validArchived.length;
+  
+  if (deletedCount > 0) {
+    console.log(`Cleaned up ${deletedCount} archived briefings older than ${ARCHIVE_DAYS} days`);
+  }
+  
   localStorage.setItem(BRIEFING_ARCHIVE_KEY, JSON.stringify(validArchived));
+  return deletedCount;
+};
+
+// Enhanced archive management
+const getArchiveStats = () => {
+  const archived = getArchivedBriefings();
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - ARCHIVE_DAYS);
+  
+  const expiredCount = archived.filter(briefing => 
+    new Date(briefing.archivedAt || briefing.generatedAt) <= cutoffDate
+  ).length;
+  
+  return {
+    totalArchived: archived.length,
+    expiredCount,
+    validCount: archived.length - expiredCount
+  };
 };
 
 // Report storage functions
@@ -600,6 +624,147 @@ export default function MercuryCIPage() {
   const [selectedBriefing, setSelectedBriefing] = useState<StoredBriefing | null>(null);
   const router = useRouter();
 
+  // Toast notification system
+  const showNotification = (type: 'success' | 'warning' | 'error', message: string, details?: string) => {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300 ${
+      type === 'success' ? 'bg-green-500 text-white' :
+      type === 'warning' ? 'bg-yellow-500 text-white' :
+      'bg-red-500 text-white'
+    }`;
+    
+    const icon = type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '❌';
+    
+    notification.innerHTML = `
+      <div class="flex items-start space-x-3">
+        <span class="text-lg">${icon}</span>
+        <div class="flex-1">
+          <p class="font-medium">${message}</p>
+          ${details ? `<p class="text-sm opacity-90 mt-1">${details}</p>` : ''}
+        </div>
+        <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200 ml-2">
+          ✕
+        </button>
+      </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      if (notification.parentElement) {
+        notification.remove();
+      }
+    }, 5000);
+  };
+
+  // PDF Export function for briefings
+  const exportBriefingToPDF = (briefing: StoredBriefing) => {
+    try {
+      // Create a clean HTML version of the briefing
+      const cleanBriefing = briefing.briefing
+        .replace(/^# Daily Intelligence Briefing - \d{4}-\d{2}-\d{2}$/gm, `# Daily Intelligence Briefing - ${new Date(briefing.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`)
+        .replace(/^## /gm, '\n## ')
+        .replace(/^### /gm, '\n### ')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1');
+
+      // Create HTML content for PDF
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Mercury CI Briefing - ${new Date(briefing.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</title>
+          <style>
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+              line-height: 1.6; 
+              color: #333; 
+              max-width: 800px; 
+              margin: 0 auto; 
+              padding: 20px;
+              background: white;
+            }
+            h1 { color: #1e40af; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
+            h2 { color: #374151; margin-top: 30px; }
+            h3 { color: #4b5563; margin-top: 20px; }
+            .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+            .kpi-card { background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6; }
+            .kpi-value { font-size: 1.5em; font-weight: bold; color: #1e40af; }
+            .kpi-label { color: #6b7280; font-size: 0.9em; }
+            .insights { background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 15px 0; }
+            .sources { background: #f9fafb; padding: 10px; border-radius: 6px; font-size: 0.9em; color: #6b7280; }
+            .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 0.9em; }
+            @media print { body { margin: 0; padding: 15px; } }
+          </style>
+        </head>
+        <body>
+          <div class="content">
+            ${cleanBriefing.replace(/\n/g, '<br>')}
+            
+            ${briefing.kpis && briefing.kpis.length > 0 ? `
+              <div class="kpi-grid">
+                ${briefing.kpis.map((kpi: any) => `
+                  <div class="kpi-card">
+                    <div class="kpi-value">${kpi.value}</div>
+                    <div class="kpi-label">${kpi.label}</div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+            
+            ${briefing.insights && briefing.insights.length > 0 ? `
+              <div class="insights">
+                <h3>Key Insights</h3>
+                <ul>
+                  ${briefing.insights.map((insight: string) => `<li>${insight}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+            
+            ${briefing.sources && briefing.sources.length > 0 ? `
+              <div class="sources">
+                <strong>Data Sources:</strong> ${briefing.sources.join(', ')}
+              </div>
+            ` : ''}
+          </div>
+          
+          <div class="footer">
+            <p>Generated by Mercury CI on ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <p>Powered by mtb labs</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Create and download the HTML file (can be opened in browser and printed to PDF)
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `mercury-ci-briefing-${briefing.date}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showNotification(
+        'success',
+        'Briefing exported successfully!',
+        'HTML file downloaded - open in browser and print to PDF for best results.'
+      );
+      
+    } catch (error) {
+      console.error('Error exporting briefing:', error);
+      showNotification(
+        'error',
+        'Export failed',
+        'Unable to export briefing. Please try again.'
+      );
+    }
+  };
+
   useEffect(() => {
     // Check authentication status
     // For now, we'll simulate a check
@@ -629,10 +794,23 @@ export default function MercuryCIPage() {
       setBriefings(storedBriefings);
       
       // Cleanup archived briefings older than 30 days
-      cleanupArchivedBriefings();
+      const deletedCount = cleanupArchivedBriefings();
+      if (deletedCount > 0) {
+        console.log(`Cleaned up ${deletedCount} expired briefings from archive`);
+      }
     };
 
     loadBriefings();
+    
+    // Set up automatic cleanup every 24 hours
+    const cleanupInterval = setInterval(() => {
+      const deletedCount = cleanupArchivedBriefings();
+      if (deletedCount > 0) {
+        console.log(`Automatic cleanup: ${deletedCount} expired briefings removed`);
+      }
+    }, 24 * 60 * 60 * 1000); // 24 hours
+
+    return () => clearInterval(cleanupInterval);
   }, []);
 
   const handleLogout = () => {
@@ -748,14 +926,15 @@ export default function MercuryCIPage() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         {activeTab === 'briefing' && (
-          <BriefingTab 
-            briefings={briefings}
-            setBriefings={setBriefings}
-            showBriefingSidebar={showBriefingSidebar}
-            setShowBriefingSidebar={setShowBriefingSidebar}
-            selectedBriefing={selectedBriefing}
-            setSelectedBriefing={setSelectedBriefing}
-          />
+        <BriefingTab 
+          briefings={briefings}
+          setBriefings={setBriefings}
+          showBriefingSidebar={showBriefingSidebar}
+          setShowBriefingSidebar={setShowBriefingSidebar}
+          selectedBriefing={selectedBriefing}
+          setSelectedBriefing={setSelectedBriefing}
+          showNotification={showNotification}
+        />
         )}
         {activeTab === 'data' && <DataTab />}
         {activeTab === 'artifacts' && <ArtifactsTab />}
@@ -797,6 +976,7 @@ export default function MercuryCIPage() {
           const updatedBriefings = deleteBriefing(id);
           setBriefings(updatedBriefings);
         }}
+        exportBriefingToPDF={exportBriefingToPDF}
       />
 
       <CopilotSidebar
@@ -819,14 +999,16 @@ function BriefingTab({
   showBriefingSidebar, 
   setShowBriefingSidebar,
   selectedBriefing,
-  setSelectedBriefing
+  setSelectedBriefing,
+  showNotification
 }: { 
   briefings: StoredBriefing[], 
   setBriefings: (briefings: StoredBriefing[]) => void,
   showBriefingSidebar: boolean,
   setShowBriefingSidebar: (show: boolean) => void,
   selectedBriefing: StoredBriefing | null,
-  setSelectedBriefing: (briefing: StoredBriefing | null) => void
+  setSelectedBriefing: (briefing: StoredBriefing | null) => void,
+  showNotification: (type: 'success' | 'warning' | 'error', message: string, details?: string) => void
 }) {
   const [selectedSources, setSelectedSources] = useState(['news', 'market']);
   const [briefingDate, setBriefingDate] = useState(new Date().toISOString().split('T')[0]);
@@ -919,13 +1101,157 @@ function BriefingTab({
     }
   };
 
+  const exportBriefingToPDF = (briefing: StoredBriefing) => {
+    try {
+      // Create a clean HTML version of the briefing
+      const cleanBriefing = briefing.briefing
+        .replace(/^# Daily Intelligence Briefing - \d{4}-\d{2}-\d{2}$/gm, `# Daily Intelligence Briefing - ${new Date(briefing.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`)
+        .replace(/^## /gm, '\n## ')
+        .replace(/^### /gm, '\n### ')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1');
+
+      // Create HTML content for PDF
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Mercury CI Briefing - ${new Date(briefing.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</title>
+          <style>
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+              line-height: 1.6; 
+              color: #333; 
+              max-width: 800px; 
+              margin: 0 auto; 
+              padding: 20px;
+              background: white;
+            }
+            h1 { color: #1e40af; border-bottom: 2px solid #1e40af; padding-bottom: 10px; }
+            h2 { color: #374151; margin-top: 30px; }
+            h3 { color: #4b5563; margin-top: 20px; }
+            .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+            .kpi-card { background: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6; }
+            .kpi-value { font-size: 1.5em; font-weight: bold; color: #1e40af; }
+            .kpi-label { color: #6b7280; font-size: 0.9em; }
+            .insights { background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 15px 0; }
+            .sources { background: #f9fafb; padding: 10px; border-radius: 6px; font-size: 0.9em; color: #6b7280; }
+            .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 0.9em; }
+            @media print { body { margin: 0; padding: 15px; } }
+          </style>
+        </head>
+        <body>
+          <div class="content">
+            ${cleanBriefing.replace(/\n/g, '<br>')}
+            
+            ${briefing.kpis && briefing.kpis.length > 0 ? `
+              <div class="kpi-grid">
+                ${briefing.kpis.map((kpi: any) => `
+                  <div class="kpi-card">
+                    <div class="kpi-value">${kpi.value}</div>
+                    <div class="kpi-label">${kpi.label}</div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+            
+            ${briefing.insights && briefing.insights.length > 0 ? `
+              <div class="insights">
+                <h3>Key Insights</h3>
+                <ul>
+                  ${briefing.insights.map((insight: string) => `<li>${insight}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+            
+            ${briefing.sources && briefing.sources.length > 0 ? `
+              <div class="sources">
+                <strong>Data Sources:</strong> ${briefing.sources.join(', ')}
+              </div>
+            ` : ''}
+          </div>
+          
+          <div class="footer">
+            <p>Generated by Mercury CI on ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <p>Powered by mtb labs</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Create and download the HTML file (can be opened in browser and printed to PDF)
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `mercury-ci-briefing-${briefing.date}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showNotification(
+        'success',
+        'Briefing exported successfully!',
+        'HTML file downloaded - open in browser and print to PDF for best results.'
+      );
+      
+    } catch (error) {
+      console.error('Error exporting briefing:', error);
+      showNotification(
+        'error',
+        'Export failed',
+        'Unable to export briefing. Please try again.'
+      );
+    }
+  };
+
+  // Enhanced error handling
+  const handleError = (error: any, context: string) => {
+    console.error(`Error in ${context}:`, error);
+    
+    let errorMessage = 'An unexpected error occurred';
+    let errorDetails = 'Please try again or contact support if the issue persists';
+    
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    }
+    
+    // Context-specific error messages
+    switch (context) {
+      case 'briefing-generation':
+        errorMessage = 'Failed to generate briefing';
+        errorDetails = 'Unable to create intelligence briefing. Please check your connection and try again.';
+        break;
+      case 'file-upload':
+        errorMessage = 'File upload failed';
+        errorDetails = 'Unable to upload file. Please check file format and size, then try again.';
+        break;
+      case 'file-analysis':
+        errorMessage = 'Analysis failed';
+        errorDetails = 'Unable to analyze document. Please ensure the file is readable and try again.';
+        break;
+      case 'data-export':
+        errorMessage = 'Export failed';
+        errorDetails = 'Unable to export data. Please try again or use a different format.';
+        break;
+    }
+    
+    setError(errorMessage);
+    showNotification('error', errorMessage, errorDetails);
+  };
+
   // Generate Briefing Function
-  const generateBriefing = () => {
+  const generateBriefing = async () => {
     setIsGenerating(true);
     setError(null);
     
-    // Simulate the briefing generation with a delay
-    setTimeout(() => {
+    try {
+      // Simulate the briefing generation with a delay
+      setTimeout(() => {
       const briefingId = `briefing-${Date.now()}`;
       const briefingTitle = `Intelligence Briefing - ${new Date(briefingDate).toLocaleDateString('en-GB')}`;
       
@@ -1000,6 +1326,11 @@ This briefing incorporates data from: ${selectedSources.join(', ')}`,
       setLastBriefingDate(new Date(briefingDate).toLocaleDateString('en-GB'));
       setIsGenerating(false);
     }, 2000); // Simulate 2 second delay
+    
+    } catch (error) {
+      handleError(error, 'briefing-generation');
+      setIsGenerating(false);
+    }
   };
 
   return (
@@ -1280,13 +1611,15 @@ function BriefingHistorySidebar({
   showSidebar, 
   setShowSidebar, 
   loadBriefing, 
-  deleteBriefingById 
+  deleteBriefingById,
+  exportBriefingToPDF 
 }: { 
   briefings: StoredBriefing[], 
   showSidebar: boolean, 
   setShowSidebar: (show: boolean) => void,
   loadBriefing: (briefing: StoredBriefing | null) => void,
-  deleteBriefingById: (id: string) => void
+  deleteBriefingById: (id: string) => void,
+  exportBriefingToPDF: (briefing: StoredBriefing) => void
 }) {
   const recentBriefings = briefings.slice(0, 5);
   const allBriefings = briefings;
@@ -1344,9 +1677,20 @@ function BriefingHistorySidebar({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          exportBriefingToPDF(briefing);
+                        }}
+                        className="ml-2 p-1 text-neutral-400 hover:text-blue-500 transition-colors"
+                        title="Export to PDF"
+                      >
+                        📄
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           deleteBriefingById(briefing.id);
                         }}
                         className="ml-2 p-1 text-neutral-400 hover:text-red-500 transition-colors"
+                        title="Delete briefing"
                       >
                         🗑️
                       </button>
@@ -1379,15 +1723,26 @@ function BriefingHistorySidebar({
                             {new Date(briefing.date).toLocaleDateString('en-GB')} • {briefing.sources.join(', ')}
                           </p>
             </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteBriefingById(briefing.id);
-                          }}
-                          className="ml-2 p-1 text-neutral-400 hover:text-red-500 transition-colors"
-                        >
-                          🗑️
-                        </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              exportBriefingToPDF(briefing);
+                            }}
+                            className="ml-2 p-1 text-neutral-400 hover:text-blue-500 transition-colors"
+                            title="Export to PDF"
+                          >
+                            📄
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteBriefingById(briefing.id);
+                            }}
+                            className="ml-2 p-1 text-neutral-400 hover:text-red-500 transition-colors"
+                            title="Delete briefing"
+                          >
+                            🗑️
+                          </button>
             </div>
             </div>
                   ))}
@@ -1431,6 +1786,10 @@ function DataTab() {
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  
+  // Performance optimizations
+  const [analysisCache, setAnalysisCache] = useState<{[fileId: string]: any}>({});
+  const [isProcessing, setIsProcessing] = useState<{[fileId: string]: boolean}>({});
 
   // File storage utilities
   const DATA_FILES_STORAGE_KEY = 'mercury-data-files';
@@ -2024,7 +2383,11 @@ function DataTab() {
         const csvContent = 'Type,Value,Source\n' + contacts.map(c => `${c.type},${c.value},${c.source}`).join('\n');
         downloadFile(csvContent, 'contacts.csv', 'text/csv');
       } else {
-        alert('No contact information to export');
+        showNotification(
+          'warning',
+          'No contact information to export',
+          'This document does not contain any contact details (emails, phones, names) to export.'
+        );
       }
     } else if (format === 'json') {
       // Export full analysis as JSON
@@ -2059,9 +2422,17 @@ function DataTab() {
     }
     
     if (sensitiveData.length > 0) {
-      alert(`⚠️ Flagged for Review\n\nThis document contains sensitive data:\n• ${sensitiveData.join('\n• ')}\n\nPlease ensure proper handling and compliance.`);
+      showNotification(
+        'warning',
+        'Document Flagged for Review',
+        `This document contains sensitive data: ${sensitiveData.join(', ')}. Please ensure proper handling and compliance.`
+      );
     } else {
-      alert('✅ Document flagged for review\n\nNo sensitive data detected, but document has been flagged for manual review.');
+      showNotification(
+        'success',
+        'Document Flagged for Review',
+        'No sensitive data detected, but document has been flagged for manual review.'
+      );
     }
   };
 
@@ -2301,7 +2672,11 @@ function DataTab() {
       }
       
       if (contacts.length === 0) {
-        alert('No contact information found in this document to export to CRM.');
+        showNotification(
+          'warning',
+          'No contact information found',
+          'This document does not contain any email addresses or contact details to export to CRM.'
+        );
         return;
       }
       
@@ -2506,6 +2881,28 @@ function DataTab() {
     const file = uploadedFiles.find(f => f.id === fileId);
     if (!file || !file.data) return;
 
+    // Check cache first
+    if (analysisCache[fileId]) {
+      console.log('Using cached analysis for file:', fileId);
+      setUploadedFiles(prev => {
+        const updated = prev.map(f => 
+          f.id === fileId ? { ...f, status: 'processed' as const, analysisResult: analysisCache[fileId] } : f
+        );
+        saveFiles(updated);
+        return updated;
+      });
+      return;
+    }
+    
+    // Prevent duplicate processing
+    if (isProcessing[fileId]) {
+      console.log('File already being processed:', fileId);
+      return;
+    }
+    
+    // Update processing state
+    setIsProcessing(prev => ({ ...prev, [fileId]: true }));
+
     // Update status to analysing
     setUploadedFiles(prev => {
       const updated = prev.map(f => 
@@ -2532,6 +2929,9 @@ function DataTab() {
       }
 
       // Update file with analysis result
+      // Cache the analysis result
+      setAnalysisCache(prev => ({ ...prev, [fileId]: analysisResult }));
+      
       setUploadedFiles(prev => {
         const updated = prev.map(f => 
           f.id === fileId ? { 
@@ -2581,6 +2981,19 @@ function DataTab() {
         );
         saveFiles(updated);
         return updated;
+      });
+      
+      showNotification(
+        'error',
+        'Analysis Failed',
+        'Unable to analyze document. Please try again or check file format.'
+      );
+    } finally {
+      // Clear processing state
+      setIsProcessing(prev => {
+        const newState = { ...prev };
+        delete newState[fileId];
+        return newState;
       });
     }
   };
