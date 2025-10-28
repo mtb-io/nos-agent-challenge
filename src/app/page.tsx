@@ -64,11 +64,11 @@ const analyzeBinaryFile = (fileName: string, fileExtension: string, content: str
   };
 };
 
-// Generate human-readable summary
+// Generate intelligent, specific human-readable summary
 const generateHumanSummary = (docType: string, wordCount: number, emails: string[], phones: string[], postcodes: string[], currencies: string[], niNumbers: string[], issuer: string | null, recipient: string | null, fileName: string): string => {
   const parts = [];
   
-  // Document type and basic info
+  // Document type and context
   if (docType === 'Letter') {
     parts.push(`This is an official letter from ${issuer || 'an unknown sender'}`);
     if (recipient) {
@@ -98,11 +98,11 @@ const generateHumanSummary = (docType: string, wordCount: number, emails: string
       parts.push(`from ${issuer}`);
     }
   }
-  
-  // Content length
+
+  // Content analysis
   parts.push(`containing ${wordCount} words`);
-  
-  // Key entities found
+
+  // Entity analysis with specific insights
   const entityDescriptions = [];
   if (emails.length > 0) {
     entityDescriptions.push(`${emails.length} email address${emails.length > 1 ? 'es' : ''}`);
@@ -119,22 +119,36 @@ const generateHumanSummary = (docType: string, wordCount: number, emails: string
   if (niNumbers.length > 0) {
     entityDescriptions.push(`${niNumbers.length} National Insurance number${niNumbers.length > 1 ? 's' : ''}`);
   }
-  
+
   if (entityDescriptions.length > 0) {
     parts.push(`with ${entityDescriptions.join(', ')}`);
   }
-  
-  // Document purpose inference
-  if (fileName.toLowerCase().includes('national insurance') || fileName.toLowerCase().includes('ni')) {
+
+  // Document-specific insights based on filename and content
+  const fileNameLower = fileName.toLowerCase();
+  if (fileNameLower.includes('national insurance') || fileNameLower.includes('ni') || niNumbers.length > 0) {
     parts.push('This appears to be related to National Insurance matters');
-  } else if (fileName.toLowerCase().includes('assessment')) {
-    parts.push('This appears to be an assessment document');
-  } else if (fileName.toLowerCase().includes('tax')) {
-    parts.push('This appears to be tax-related');
-  } else if (fileName.toLowerCase().includes('hmrc')) {
+  } else if (fileNameLower.includes('assessment') || fileNameLower.includes('tax')) {
+    parts.push('This appears to be a tax or assessment document');
+  } else if (fileNameLower.includes('hmrc') || fileNameLower.includes('revenue')) {
     parts.push('This appears to be from HM Revenue & Customs');
+  } else if (fileNameLower.includes('payslip') || fileNameLower.includes('salary')) {
+    parts.push('This appears to be payroll-related');
+  } else if (fileNameLower.includes('contract') || fileNameLower.includes('agreement')) {
+    parts.push('This appears to be a legal agreement');
+  } else if (fileNameLower.includes('invoice') || fileNameLower.includes('bill')) {
+    parts.push('This appears to be a financial document');
   }
-  
+
+  // Data quality assessment
+  if (wordCount > 500) {
+    parts.push('The document contains substantial content suitable for detailed analysis');
+  } else if (wordCount > 100) {
+    parts.push('The document contains moderate content for analysis');
+  } else {
+    parts.push('The document contains brief content');
+  }
+
   return parts.join(' ') + '.';
 };
 
@@ -1413,6 +1427,7 @@ function DataTab() {
     analysisResult?: any;
     uploadedAt: string;
   }>>([]);
+  const [customRoutes, setCustomRoutes] = useState<{[fileId: string]: any}>({});
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -1428,83 +1443,171 @@ function DataTab() {
   // File Analysis Functions
   const analyzeCSVFile = (data: string, fileName: string) => {
     const lines = data.split('\n').filter(line => line.trim());
-    const headers = lines[0]?.split(',').map(h => h.trim()) || [];
-    const rowCount = lines.length - 1;
-    const dataRows = lines.slice(1);
+    const headers = lines[0]?.split(',').map(h => h.trim().replace(/"/g, '')) || [];
+    const rows = lines.slice(1).map(line => 
+      line.split(',').map(cell => cell.trim().replace(/"/g, ''))
+    ).filter(row => row.some(cell => cell.length > 0));
     
-    // Analyze data types and patterns
-    const columnTypes = headers.map((header, index) => {
-      const columnData = dataRows.map(row => row.split(',')[index]?.trim()).filter(val => val);
-      const numericCount = columnData.filter(val => !isNaN(Number(val)) && val !== '').length;
-      const dateCount = columnData.filter(val => !isNaN(Date.parse(val))).length;
+    const rowCount = rows.length;
+    const columnCount = headers.length;
+    
+    // Analyze column types and content patterns
+    const columnTypes: Array<'numeric' | 'text'> = [];
+    const columnAnalysis = headers.map((header, index) => {
+      const values = rows.map(row => row[index]).filter(val => val && val.length > 0);
+      const numericValues = values.filter(val => !isNaN(Number(val)) && val !== '');
+      const isNumeric = numericValues.length > values.length * 0.8; // 80% numeric threshold
       
-      if (numericCount / columnData.length > 0.8) return 'numeric';
-      if (dateCount / columnData.length > 0.8) return 'date';
-      return 'text';
-    });
-    
-    // Find potential key columns
-    const potentialKeys = headers.filter((header, index) => 
-      columnTypes[index] === 'text' && 
-      dataRows.every(row => row.split(',')[index]?.trim() !== '')
-    );
-    
-    // Calculate basic statistics for numeric columns
-    const numericStats = headers.map((header, index) => {
-      if (columnTypes[index] !== 'numeric') return null;
-      const values = dataRows.map(row => Number(row.split(',')[index])).filter(val => !isNaN(val));
-      if (values.length === 0) return null;
+      columnTypes.push(isNumeric ? 'numeric' : 'text');
+      
+      // Analyze content patterns
+      const uniqueValues = [...new Set(values)];
+      const hasEmails = values.some(val => val.includes('@'));
+      const hasDates = values.some(val => /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(val) || /\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}/.test(val));
+      const hasPhones = values.some(val => /[\d\s\-\(\)\+]{10,}/.test(val));
+      const hasUrls = values.some(val => val.includes('http') || val.includes('www.'));
+      const hasPostcodes = values.some(val => /[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}/.test(val));
       
       return {
-        column: header,
-        min: Math.min(...values),
-        max: Math.max(...values),
-        avg: values.reduce((a, b) => a + b, 0) / values.length,
-        count: values.length
+        header,
+        type: isNumeric ? 'numeric' : 'text',
+        uniqueCount: uniqueValues.length,
+        totalCount: values.length,
+        hasEmails,
+        hasDates,
+        hasPhones,
+        hasUrls,
+        hasPostcodes,
+        sampleValues: uniqueValues.slice(0, 3)
       };
-    }).filter(Boolean);
+    });
     
-    // Detect potential data domain based on column names
-    const domainKeywords = {
-      financial: ['price', 'cost', 'revenue', 'profit', 'amount', 'value', 'budget', 'income', 'expense'],
-      sales: ['sales', 'revenue', 'customer', 'order', 'product', 'quantity', 'units'],
-      marketing: ['campaign', 'click', 'conversion', 'impression', 'reach', 'engagement'],
-      hr: ['employee', 'salary', 'department', 'position', 'hire', 'performance'],
-      operations: ['inventory', 'stock', 'supply', 'demand', 'capacity', 'efficiency']
+    // Generate intelligent summary based on content analysis
+    const generateIntelligentSummary = (fileName: string, headers: string[], columnAnalysis: any[], rowCount: number) => {
+      const hasContactData = columnAnalysis.some(col => col.hasEmails || col.hasPhones);
+      const hasLocationData = columnAnalysis.some(col => col.hasPostcodes);
+      const hasTemporalData = columnAnalysis.some(col => col.hasDates);
+      const hasWebData = columnAnalysis.some(col => col.hasUrls);
+      
+      // Detect dataset type based on headers and content
+      const fileNameLower = fileName.toLowerCase();
+      const headerText = headers.join(' ').toLowerCase();
+      
+      let datasetType = 'General Dataset';
+      let purpose = 'data analysis';
+      
+      if (fileNameLower.includes('customer') || fileNameLower.includes('client') || hasContactData) {
+        datasetType = 'Customer/Client Database';
+        purpose = 'customer relationship management';
+      } else if (fileNameLower.includes('employee') || fileNameLower.includes('staff') || headerText.includes('employee')) {
+        datasetType = 'Employee Records';
+        purpose = 'human resources management';
+      } else if (fileNameLower.includes('product') || fileNameLower.includes('inventory') || headerText.includes('product')) {
+        datasetType = 'Product/Inventory Database';
+        purpose = 'inventory and product management';
+      } else if (fileNameLower.includes('sales') || fileNameLower.includes('transaction') || headerText.includes('sales')) {
+        datasetType = 'Sales/Transaction Data';
+        purpose = 'sales analysis and reporting';
+      } else if (fileNameLower.includes('financial') || fileNameLower.includes('account') || headerText.includes('financial')) {
+        datasetType = 'Financial Records';
+        purpose = 'financial analysis and accounting';
+      } else if (hasLocationData) {
+        datasetType = 'Geographic/Location Data';
+        purpose = 'location-based analysis';
+      } else if (hasTemporalData) {
+        datasetType = 'Time-Series Data';
+        purpose = 'temporal analysis and trend identification';
+      }
+      
+      // Build specific insights
+      const insights = [];
+      insights.push(`This ${datasetType.toLowerCase()} contains ${rowCount} records with ${headers.length} data fields`);
+      
+      if (hasContactData) {
+        insights.push('Contact information detected (emails, phone numbers)');
+      }
+      if (hasLocationData) {
+        insights.push('Geographic data present (postcodes, addresses)');
+      }
+      if (hasTemporalData) {
+        insights.push('Date/time information available for trend analysis');
+      }
+      if (hasWebData) {
+        insights.push('Web/URL references found');
+      }
+      
+      const numericColumns = columnAnalysis.filter(col => col.type === 'numeric').length;
+      if (numericColumns > 0) {
+        insights.push(`${numericColumns} numeric field${numericColumns > 1 ? 's' : ''} suitable for statistical analysis`);
+      }
+      
+      const highUniqueness = columnAnalysis.filter(col => col.uniqueCount / col.totalCount > 0.8).length;
+      if (highUniqueness > 0) {
+        insights.push(`${highUniqueness} field${highUniqueness > 1 ? 's' : ''} with high data diversity`);
+      }
+      
+      return {
+        summary: `This ${datasetType.toLowerCase()} contains ${rowCount} records across ${headers.length} fields, designed for ${purpose}. ${insights.slice(0, 2).join('. ')}.`,
+        datasetType,
+        purpose,
+        insights: insights.slice(0, 4)
+      };
     };
     
-    const detectedDomain = Object.entries(domainKeywords).find(([domain, keywords]) =>
-      headers.some(header => 
-        keywords.some(keyword => 
-          header.toLowerCase().includes(keyword)
-        )
-      )
-    )?.[0] || 'general';
+    const intelligentAnalysis = generateIntelligentSummary(fileName, headers, columnAnalysis, rowCount);
+    
+    // Calculate numeric statistics for numeric columns
+    const numericStats = columnAnalysis
+      .filter(col => col.type === 'numeric')
+      .map(col => {
+        const values = rows.map(row => row[headers.indexOf(col.header)])
+          .filter(val => val && !isNaN(Number(val)))
+          .map(val => Number(val));
+        
+        if (values.length === 0) return null;
+        
+        return {
+          column: col.header,
+          min: Math.min(...values),
+          max: Math.max(...values),
+          avg: values.reduce((a, b) => a + b, 0) / values.length,
+          count: values.length
+        };
+      })
+      .filter(Boolean);
     
     return {
-      summary: `This CSV dataset appears to contain ${detectedDomain} data with ${rowCount} records across ${headers.length} fields. The structure includes ${numericStats.length} numerical columns and ${headers.length - numericStats.length} text-based fields, making it suitable for ${numericStats.length > 0 ? 'statistical analysis and data visualisation' : 'categorical analysis and pattern recognition'}.`,
+      summary: intelligentAnalysis.summary,
       keyFindings: [
-        `Dataset contains ${rowCount} rows with ${headers.length} columns`,
-        `Column types: ${columnTypes.map((type, i) => `${headers[i]} (${type})`).slice(0, 3).join(', ')}${headers.length > 3 ? '...' : ''}`,
-        potentialKeys.length > 0 ? `Potential key columns: ${potentialKeys.slice(0, 2).join(', ')}` : 'No obvious key columns identified',
-        numericStats.length > 0 ? `Numeric data ranges from ${Math.min(...numericStats.map(s => s?.min || 0))} to ${Math.max(...numericStats.map(s => s?.max || 0))}` : 'No numeric data detected'
+        `Dataset Type: ${intelligentAnalysis.datasetType}`,
+        `Records: ${rowCount} rows across ${columnCount} columns`,
+        `Purpose: ${intelligentAnalysis.purpose}`,
+        `Data Quality: ${rowCount > 100 ? 'High' : rowCount > 50 ? 'Medium' : 'Low'} - ${rowCount} records`,
+        `Column Analysis: ${columnTypes.filter(t => t === 'numeric').length} numeric, ${columnTypes.filter(t => t === 'text').length} text fields`,
+        ...intelligentAnalysis.insights.slice(0, 2)
       ],
       recommendations: [
-        rowCount < 10 ? 'Consider collecting more data for meaningful analysis' : 'Dataset size is adequate for analysis',
-        numericStats.length > 0 ? 'Numeric columns are suitable for statistical analysis and visualisation' : 'Focus on text analysis and pattern recognition',
-        potentialKeys.length > 0 ? 'Use identified key columns for grouping and filtering' : 'Consider adding unique identifiers to each row',
-        'Validate data quality and check for missing values'
+        intelligentAnalysis.datasetType.includes('Customer') ? 'Import contacts to CRM system' : 'Process data for business intelligence',
+        columnAnalysis.some(col => col.hasEmails) ? 'Extract and validate email addresses' : 'Analyze data patterns and trends',
+        numericStats.length > 0 ? 'Generate statistical reports and visualizations' : 'Perform categorical analysis and grouping',
+        'Export processed data for further analysis'
       ],
-      visualisations: [
-        { type: 'bar', title: 'Data Distribution', description: 'Show row count and column distribution' },
-        { type: 'line', title: 'Numeric Trends', description: numericStats.length > 0 ? 'Plot trends in numeric columns' : 'Not applicable - no numeric data' },
-        { type: 'scatter', title: 'Correlation Analysis', description: numericStats.length > 1 ? 'Analyze relationships between numeric columns' : 'Requires multiple numeric columns' }
-      ],
+      visualisations: generatePracticalVisualizations(
+        intelligentAnalysis.datasetType,
+        columnAnalysis.filter(col => col.hasEmails).flatMap(col => col.sampleValues),
+        columnAnalysis.filter(col => col.hasPhones).flatMap(col => col.sampleValues),
+        columnAnalysis.filter(col => col.hasPostcodes).flatMap(col => col.sampleValues),
+        numericStats.map(stat => `£${stat?.avg?.toFixed(2)}`),
+        [],
+        columnAnalysis.filter(col => col.hasDates).flatMap(col => col.sampleValues)
+      ),
       confidence: rowCount > 50 ? 0.9 : rowCount > 10 ? 0.8 : 0.6,
-      dataQuality: rowCount > 1000 ? 'High' : rowCount > 100 ? 'Medium' : 'Low',
+      dataQuality: rowCount > 100 ? 'High' : rowCount > 50 ? 'Medium' : 'Low',
       processedRows: rowCount,
       columnTypes,
-      numericStats
+      numericStats,
+      datasetType: intelligentAnalysis.datasetType,
+      columnAnalysis
     };
   };
 
@@ -1962,33 +2065,273 @@ function DataTab() {
     }
   };
 
-  const addToCRM = (analysisResult: any) => {
-    const contacts: Array<{type: string, value: string}> = [];
-    if (analysisResult.entities?.emails?.length > 0) {
-      analysisResult.entities.emails.forEach((email: string) => {
-        contacts.push({ type: 'Email', value: email });
-      });
-    }
-    if (analysisResult.entities?.phones?.length > 0) {
-      analysisResult.entities.phones.forEach((phone: string) => {
-        contacts.push({ type: 'Phone', value: phone });
-      });
+  // Notification system - show alerts for sensitive data
+  const showNotification = (type: 'success' | 'warning' | 'error', message: string, details?: string) => {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300 ${
+      type === 'success' ? 'bg-green-500 text-white' :
+      type === 'warning' ? 'bg-yellow-500 text-white' :
+      'bg-red-500 text-white'
+    }`;
+    
+    notification.innerHTML = `
+      <div class="flex items-start space-x-3">
+        <div class="text-xl">
+          ${type === 'success' ? '✅' : type === 'warning' ? '⚠️' : '❌'}
+        </div>
+        <div class="flex-1">
+          <p class="font-medium">${message}</p>
+          ${details ? `<p class="text-sm opacity-90 mt-1">${details}</p>` : ''}
+        </div>
+        <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">
+          ✕
+        </button>
+      </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      if (notification.parentElement) {
+        notification.remove();
+      }
+    }, 5000);
+  };
+
+  // Enhanced flag for review with notifications
+  const flagForReviewWithNotification = (analysisResult: any) => {
+    const hasSensitiveData = analysisResult.entities?.ni_numbers?.length > 0 || 
+                            analysisResult.entities?.vat_numbers?.length > 0 ||
+                            analysisResult.entities?.account_numbers?.length > 0;
+    
+    if (hasSensitiveData) {
+      showNotification(
+        'warning',
+        'Sensitive Data Detected!',
+        'This document contains sensitive personal/financial information that requires immediate review.'
+      );
+    } else {
+      showNotification(
+        'success',
+        'Document Flagged',
+        'Document has been flagged for manual review.'
+      );
     }
     
-    if (contacts.length > 0) {
-      // Simulate CRM integration
-      const contactData = {
-        name: analysisResult.recipient || analysisResult.issuer || 'Unknown Contact',
-        documentType: analysisResult.docType,
-        contacts: contacts,
-        source: analysisResult.title,
-        flagged: analysisResult.entities?.ni_numbers?.length > 0 || analysisResult.entities?.vat_numbers?.length > 0
+    // Call the original function
+    flagForReview(analysisResult);
+  };
+
+  // Workflow routing - determine where document should go based on content
+  const getWorkflowRoute = (analysisResult: any) => {
+    const docType = analysisResult.docType?.toLowerCase() || '';
+    const hasSensitiveData = analysisResult.entities?.ni_numbers?.length > 0 || 
+                            analysisResult.entities?.vat_numbers?.length > 0 ||
+                            analysisResult.entities?.account_numbers?.length > 0;
+    const hasFinancialData = analysisResult.entities?.currencies?.length > 0;
+    const hasPersonalData = analysisResult.entities?.emails?.length > 0 || 
+                           analysisResult.entities?.phones?.length > 0;
+    
+    // Priority routing based on content
+    if (hasSensitiveData) {
+      return {
+        team: 'Compliance',
+        department: 'Data Protection',
+        priority: 'High',
+        reason: 'Contains sensitive personal/financial data',
+        icon: '⚠️',
+        color: 'red',
+        action: 'Immediate review required'
       };
+    }
+    
+    if (docType.includes('invoice') || docType.includes('receipt') || hasFinancialData) {
+      return {
+        team: 'Finance',
+        department: 'Accounts',
+        priority: 'Medium',
+        reason: 'Financial document or contains monetary data',
+        icon: '💰',
+        color: 'green',
+        action: 'Process payment/accounting'
+      };
+    }
+    
+    if (docType.includes('contract') || docType.includes('agreement')) {
+      return {
+        team: 'Legal',
+        department: 'Contracts',
+        priority: 'High',
+        reason: 'Legal document requiring review',
+        icon: '⚖️',
+        color: 'blue',
+        action: 'Legal review and approval'
+      };
+    }
+    
+    if (docType.includes('letter') || docType.includes('correspondence')) {
+      return {
+        team: 'Admin',
+        department: 'General',
+        priority: 'Low',
+        reason: 'General correspondence',
+        icon: '📄',
+        color: 'gray',
+        action: 'File and respond if needed'
+      };
+    }
+    
+    if (hasPersonalData) {
+      return {
+        team: 'HR',
+        department: 'Personnel',
+        priority: 'Medium',
+        reason: 'Contains personal contact information',
+        icon: '👥',
+        color: 'purple',
+        action: 'Update contact database'
+      };
+    }
+    
+    // Default routing
+    return {
+      team: 'Admin',
+      department: 'General',
+      priority: 'Low',
+      reason: 'General document',
+      icon: '📋',
+      color: 'gray',
+      action: 'Standard processing'
+    };
+  };
+
+  // Auto-route document to appropriate team
+  const autoRouteDocument = (analysisResult: any, fileId: string) => {
+    const customRoute = customRoutes[fileId];
+    const route = customRoute || getWorkflowRoute(analysisResult);
+    
+    // Simulate routing process
+    const routingData = {
+      documentId: analysisResult.title || 'Unknown Document',
+      documentType: analysisResult.docType,
+      routedTo: route.team,
+      department: route.department,
+      priority: route.priority,
+      reason: route.reason,
+      timestamp: new Date().toISOString(),
+      status: 'Routed',
+      customRoute: !!customRoute
+    };
+    
+    console.log('Document Routing:', routingData);
+    
+    // Show notification instead of alert
+    showNotification(
+      'success',
+      `Document Auto-Routed to ${route.team}`,
+      `${route.department} - ${route.priority} Priority: ${route.action}${customRoute ? ' (Custom Route)' : ''}`
+    );
+  };
+
+  const handleRouteChange = (fileId: string, newRoute: any) => {
+    setCustomRoutes(prev => ({
+      ...prev,
+      [fileId]: newRoute
+    }));
+    
+    showNotification(
+      'success',
+      'Route Updated',
+      `Document will be routed to ${newRoute.team} Team (${newRoute.priority} Priority)`
+    );
+  };
+
+  // Add to CRM - Export contacts as CSV for import
+  const addToCRM = (analysisResult: any) => {
+    try {
+      // Extract contact data from analysis results
+      const contacts: Array<{name: string, email: string, phone: string, company: string, source: string}> = [];
       
-      console.log('CRM Integration Data:', contactData);
-      alert(`👥 Added to CRM\n\nContact: ${contactData.name}\nType: ${contactData.documentType}\nContacts: ${contacts.length} found\n\nData ready for CRM import.`);
-    } else {
-      alert('No contact information found to add to CRM');
+      // Get document info
+      const documentName = analysisResult.title || 'Unknown Document';
+      const issuer = analysisResult.issuer || '';
+      const recipient = analysisResult.recipient || '';
+      
+      // Extract emails
+      const emails = analysisResult.entities?.emails || [];
+      const phones = analysisResult.entities?.phones || [];
+      
+      // Create contact entries
+      if (emails.length > 0) {
+        emails.forEach((email: string, index: number) => {
+          const phone = phones[index] || '';
+          const name = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+          
+          contacts.push({
+            name: name,
+            email: email,
+            phone: phone,
+            company: issuer || recipient || '',
+            source: documentName
+          });
+        });
+      }
+      
+      // If no emails but we have issuer/recipient info, create entries
+      if (contacts.length === 0 && (issuer || recipient)) {
+        if (issuer) {
+          contacts.push({
+            name: issuer,
+            email: '',
+            phone: phones[0] || '',
+            company: issuer,
+            source: documentName
+          });
+        }
+        if (recipient && recipient !== issuer) {
+          contacts.push({
+            name: recipient,
+            email: '',
+            phone: phones[1] || phones[0] || '',
+            company: recipient,
+            source: documentName
+          });
+        }
+      }
+      
+      if (contacts.length === 0) {
+        alert('No contact information found in this document to export to CRM.');
+        return;
+      }
+      
+      // Generate CSV content
+      const csvHeaders = 'Name,Email,Phone,Company,Source Document';
+      const csvRows = contacts.map(contact => 
+        `"${contact.name}","${contact.email}","${contact.phone}","${contact.company}","${contact.source}"`
+      );
+      const csvContent = [csvHeaders, ...csvRows].join('\n');
+      
+      // Create and download file
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `crm-contacts-${timestamp}.csv`;
+      
+      downloadFile(csvContent, filename, 'text/csv');
+      
+      // Show success notification
+      showNotification(
+        'success',
+        `Exported ${contacts.length} contact${contacts.length > 1 ? 's' : ''} to CRM import file!`,
+        `File: ${filename} - Import this CSV file into Capsule CRM to add the contacts.`
+      );
+      
+    } catch (error) {
+      console.error('Error exporting to CRM:', error);
+      showNotification(
+        'error',
+        'Error exporting contacts to CRM',
+        'Please try again or check the document for contact information.'
+      );
     }
   };
 
@@ -2204,6 +2547,22 @@ function DataTab() {
 
       setSelectedFile(fileId);
       
+      // Show notifications based on analysis results
+      if ((analysisResult as any).entities?.ni_numbers?.length > 0 || (analysisResult as any).entities?.vat_numbers?.length > 0 || (analysisResult as any).entities?.account_numbers?.length > 0) {
+        showNotification(
+          'warning',
+          'Sensitive Data Detected!',
+          'This document contains sensitive personal/financial information. Consider flagging for review.'
+        );
+      }
+      
+      // Show success notification
+      showNotification(
+        'success',
+        'Document Analysis Complete',
+        `Processed ${(analysisResult as any).stats?.wordCount || analysisResult.processedRows || 0} words with ${analysisResult.confidence ? Math.round(analysisResult.confidence * 100) : 90}% confidence`
+      );
+      
       // Scroll to analysis results
       setTimeout(() => {
         const analysisElement = document.querySelector('[data-analysis-result]');
@@ -2365,7 +2724,7 @@ function DataTab() {
               {file.analysisResult.docType && (
                 <div className="mb-6">
                   <h4 className="text-lg font-semibold text-neutral-900 mb-3">Document Classification</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 gap-4">
                     <div className="p-3 bg-blue-50 rounded-lg">
                       <p className="text-sm text-blue-600 font-medium">Type</p>
                       <p className="text-blue-900 font-semibold">{file.analysisResult.docType}</p>
@@ -2493,7 +2852,7 @@ function DataTab() {
                     <span>Export JSON</span>
                   </button>
                   <button 
-                    onClick={() => flagForReview(file.analysisResult)}
+                    onClick={() => flagForReviewWithNotification(file.analysisResult)}
                     className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center space-x-2"
                   >
                     <span>⚠️</span>
@@ -2507,6 +2866,142 @@ function DataTab() {
                     <span>Add to CRM</span>
                   </button>
                 </div>
+              </div>
+
+              {/* Workflow Routing */}
+              <div className="mb-6">
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-1 h-6 bg-primary-500 rounded"></div>
+                  <h4 className="text-lg font-semibold text-neutral-900">Workflow Routing</h4>
+                </div>
+                {(() => {
+                  const defaultRoute = getWorkflowRoute(file.analysisResult);
+                  const route = customRoutes[file.id] || defaultRoute;
+                  const priorityColors = {
+                    'High': 'text-red-600 bg-red-50 border-red-200',
+                    'Medium': 'text-yellow-600 bg-yellow-50 border-yellow-200', 
+                    'Low': 'text-green-600 bg-green-50 border-green-200'
+                  };
+                  const teamColors = {
+                    'Compliance': 'border-red-200 bg-red-50',
+                    'Finance': 'border-green-200 bg-green-50',
+                    'Legal': 'border-blue-200 bg-blue-50',
+                    'Admin': 'border-gray-200 bg-gray-50',
+                    'HR': 'border-purple-200 bg-purple-50'
+                  };
+                  
+                  return (
+                    <div className="space-y-4">
+                      {/* Route Information */}
+                      <div className={`p-4 rounded-lg border-2 ${teamColors[route.team as keyof typeof teamColors] || 'border-gray-200 bg-gray-50'}`}>
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center space-x-3">
+                            <span className="text-2xl">{route.icon}</span>
+            <div>
+                              <h5 className="font-semibold text-neutral-900">{route.team} Team</h5>
+                              <p className="text-sm text-neutral-600">{route.department}</p>
+                              <p className="text-sm text-neutral-500">{route.reason}</p>
+            </div>
+                          </div>
+                          <div className={`px-3 py-1 rounded-full text-xs font-medium border ${priorityColors[route.priority as keyof typeof priorityColors]}`}>
+                            {route.priority} Priority
+                          </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-neutral-200">
+                          <p className="text-sm text-neutral-700">
+                            <strong>Action:</strong> {route.action}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Route Selection */}
+                      <div className="space-y-3">
+                        <h5 className="text-sm font-medium text-neutral-700">Change Route (Optional)</h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+                            <label className="block text-xs text-neutral-600 mb-1">Team</label>
+                            <select 
+                              value={route.team}
+                              onChange={(e) => {
+                                const newRoute = {
+                                  ...route,
+                                  team: e.target.value,
+                                  department: e.target.value === 'Compliance' ? 'Data Protection' : 
+                                             e.target.value === 'Finance' ? 'Accounts' :
+                                             e.target.value === 'Legal' ? 'Contracts' :
+                                             e.target.value === 'HR' ? 'Personnel' : 'Administration',
+                                  icon: e.target.value === 'Compliance' ? '🛡️' : 
+                                        e.target.value === 'Finance' ? '💰' :
+                                        e.target.value === 'Legal' ? '⚖️' :
+                                        e.target.value === 'HR' ? '👥' : '📋'
+                                };
+                                handleRouteChange(file.id, newRoute);
+                              }}
+                              className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                              <option value="Compliance">🛡️ Compliance</option>
+                              <option value="Finance">💰 Finance</option>
+                              <option value="Legal">⚖️ Legal</option>
+                              <option value="HR">👥 HR</option>
+                              <option value="Admin">📋 Admin</option>
+                            </select>
+            </div>
+            <div>
+                            <label className="block text-xs text-neutral-600 mb-1">Priority</label>
+                            <select 
+                              value={route.priority}
+                              onChange={(e) => {
+                                const newRoute = { ...route, priority: e.target.value };
+                                handleRouteChange(file.id, newRoute);
+                              }}
+                              className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                              <option value="High">🔴 High</option>
+                              <option value="Medium">🟡 Medium</option>
+                              <option value="Low">🟢 Low</option>
+                            </select>
+            </div>
+          </div>
+                        {customRoutes[file.id] && (
+                          <div className="flex items-center space-x-2 text-xs text-blue-600">
+                            <span>✓</span>
+                            <span>Custom route selected</span>
+                            <button 
+                              onClick={() => {
+                                setCustomRoutes(prev => {
+                                  const newRoutes = { ...prev };
+                                  delete newRoutes[file.id];
+                                  return newRoutes;
+                                });
+                                showNotification('success', 'Route Reset', 'Using default AI-suggested route');
+                              }}
+                              className="text-red-600 hover:text-red-800 underline"
+                            >
+                              Reset to Default
+                            </button>
+        </div>
+                        )}
+                      </div>
+                      
+                      {/* Auto-Route Button */}
+                      <div className="flex justify-center">
+                        <button 
+                          onClick={() => autoRouteDocument(file.analysisResult, file.id)}
+                          className={`px-6 py-3 rounded-lg font-medium transition-colors flex items-center space-x-2 ${
+                            route.priority === 'High' 
+                              ? 'bg-red-500 hover:bg-red-600 text-white' 
+                              : route.priority === 'Medium'
+                              ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                              : 'bg-green-500 hover:bg-green-600 text-white'
+                          }`}
+                        >
+                          <span>🚀</span>
+                          <span>Auto-Route to {route.team}</span>
+                        </button>
+      </div>
+    </div>
+  );
+                })()}
               </div>
 
               {/* Practical Visualisations */}
@@ -2542,7 +3037,7 @@ function DataTab() {
                                     {viz.data.phones.map((phone: string, i: number) => (
                                       <p key={i} className="text-sm text-neutral-700 bg-white px-2 py-1 rounded">{phone}</p>
                                     ))}
-            </div>
+          </div>
                                 )}
           </div>
                             )}
@@ -2608,8 +3103,8 @@ function DataTab() {
               <div className="flex items-center justify-between text-sm text-neutral-500">
                 <span>Processed {file.analysisResult.processedRows || file.analysisResult.stats?.wordCount || 0} words</span>
                 <span>Powered by Mercury CI Analysis Engine</span>
-              </div>
-            </div>
+        </div>
+      </div>
           </div>
         );
       })()}
